@@ -1,10 +1,11 @@
 #' Adjust for batch effects using a beta regression framework in DNA methylation data
 #'
-#' ComBat-met fits beta regression models to the beta-values, 
+#' ComBat-met fits beta regression models to the beta-values or M-values, 
 #' calculates batch-free distributions, and maps the quantiles of the estimated distributions 
 #' to their batch-free counterparts.
 #'
-#' @param bv matrix of beta-values
+#' @param vmat matrix of beta-values or M-values
+#' @param dtype data type: beta-values or M-values; note that the input and output have the same data type.
 #' @param batch vector for batch
 #' @param group optional vector for biological condition of interest
 #' @param covar_mod optional model matrix representing co-variates to be included in the model
@@ -13,10 +14,10 @@
 #' @param mean.only Boolean variable indicating whether to apply EB-shrinkage on the estimation of dispersion effects
 #' @param feature.subset.n number of features to use in non-parametric EB estimation, only useful when shrink equals TRUE
 #' @param pseudo_beta pseudo beta-values to be used for replacing extreme 0 and 1 beta-values. 
-#' Value needs to be between 0 and 0.5.
+#' Value needs to be between 0 and 0.5. Only active when data type is beta-values.
 #' @param ref.batch NULL by default. If given, that batch will be selected as a reference for batch correction.
 #' 
-#' @return \code{ComBat_met} returns a feature x sample beta-value matrix, adjusted for batch effects.
+#' @return \code{ComBat_met} returns a feature x sample matrix with the same data type as input, adjusted for batch effects.
 #' @export
 #' 
 #' @examples
@@ -26,37 +27,51 @@
 #' group <- rep(c(0, 1), 4)
 #'
 #' # Adjust for batch effects including biological conditions
-#' adj_bv_mat <- ComBat_met(bv_mat, batch = batch, group = group, full_mod = TRUE)
+#' adj_bv_mat <- ComBat_met(bv_mat, dtype = "b-value", batch = batch, group = group, full_mod = TRUE)
 #' # Adjust for batch effects without including biological conditions
-#' adj_bv_mat <- ComBat_met(bv_mat, batch = batch, group = group, full_mod = FALSE)
+#' adj_bv_mat <- ComBat_met(bv_mat, dtype = "b-value", batch = batch, group = group, full_mod = FALSE)
 #'
+#' # Generate a random M-value matrix
+#' mv_mat <- matrix(rnorm(n = 400, mean = 0, sd = 1), nrow = 50, ncol = 8)
+#' batch <- c(rep(1, 4), rep(2, 4))
+#' group <- rep(c(0, 1), 4)
+#'
+#' # Adjust for batch effects including biological conditions
+#' adj_mv_mat <- ComBat_met(mv_mat, dtype = "M-value", batch = batch, group = group, full_mod = TRUE)
+#' # Adjust for batch effects without including biological conditions
+#' adj_mv_mat <- ComBat_met(mv_mat, dtype = "M-value", batch = batch, group = group, full_mod = FALSE)
 
-ComBat_met <- function(bv, batch, group = NULL, covar_mod = NULL, full_mod = TRUE,
+ComBat_met <- function(vmat, dtype = c("b-value", "M-value"), 
+                       batch, group = NULL, covar_mod = NULL, full_mod = TRUE,
                        shrink = FALSE, mean.only = FALSE, feature.subset.n = NULL,
                        pseudo_beta = 1e-4, ref.batch = NULL) {
   ########  Preparation  ########
   ## convert extreme 0 or 1 values to pseudo-beta
-  if (pseudo_beta <= 0 | pseudo_beta >= 0.5) {
-    stop("Invalid pseudo beta-values.")
+  if (dtype == "b-value") {
+    if (pseudo_beta <= 0 | pseudo_beta >= 0.5) {
+      stop("Invalid pseudo beta-values.")
+    }
+    vmat[vmat == 0] <- pseudo_beta
+    vmat[vmat == 1] <- 1 - pseudo_beta    
   }
-  bv[bv == 0] <- pseudo_beta
-  bv[bv == 1] <- 1 - pseudo_beta
   
-  ## check if beta values and batch have matching sizes
-  if (ncol(bv) != length(batch)) {
+  ## check if coverage matrix and batch have matching sizes
+  if (ncol(vmat) != length(batch)) {
     stop("Coverage matrix and batch vector do not have matching sizes.")
   }
   
-  ## check if beta values and group have matching sizes
+  ## check if coverage matrix and group have matching sizes
   if (!is.null(group)) {
-    if (ncol(bv) != length(group)) {
+    if (ncol(vmat) != length(group)) {
       stop("Coverage matrix and group vector do not have matching sizes.")
     }
   }
   
   ## Does not allow beta values outside the (0, 1) range
-  if (sum(bv >= 1, na.rm = TRUE) > 0 | sum(bv <= 0, na.rm = TRUE) > 0) {
-    stop("All beta values must be between 0 and 1.")
+  if (dtype == "b-value") {
+    if (sum(vmat >= 1, na.rm = TRUE) > 0 | sum(vmat <= 0, na.rm = TRUE) > 0) {
+      stop("All beta values must be between 0 and 1.")
+    }    
   }
   
   ## Does not support more than 1 batch variable
@@ -83,19 +98,19 @@ ComBat_met <- function(bv, batch, group = NULL, covar_mod = NULL, full_mod = TRU
   
   ## Remove features with zero variance across all batches
   zero.var.rows.lst <- lapply(levels(batch), function(b) {
-    which(apply(bv[, batch == b], 1, function(x) {stats::var(x, na.rm = TRUE) == 0}))
+    which(apply(vmat[, batch == b], 1, function(x) {stats::var(x, na.rm = TRUE) == 0}))
   })
   all.zero.var.rows <- Reduce(intersect, zero.var.rows.lst)
   
   if (length(all.zero.var.rows) > 0) {
-    cat(sprintf("Found %s features with uniform beta values across all batches; 
+    cat(sprintf("Found %s features with uniform values across all batches; 
                 these features will not be adjusted for batch effects.\n",
                 length(all.zero.var.rows)))
   }
   
-  keep <- setdiff(1:nrow(bv), all.zero.var.rows)
-  bvOri <- bv
-  bv <- bvOri[keep, ]
+  keep <- setdiff(1:nrow(vmat), all.zero.var.rows)
+  vmatOri <- vmat
+  vmat <- vmatOri[keep, ]
   
   ## Create a vector for correction types
   if (mean.only) {
@@ -125,7 +140,7 @@ ComBat_met <- function(bv, batch, group = NULL, covar_mod = NULL, full_mod = TRU
     mod <- stats::model.matrix(~group)
   } else {
     cat("Using null model in ComBat-met.\n")
-    mod <- stats::model.matrix(~1, data = as.data.frame(t(bv)))
+    mod <- stats::model.matrix(~1, data = as.data.frame(t(vmat)))
   }
   # covariate matrix
   if (!is.null(covar_mod)) {
@@ -174,8 +189,15 @@ ComBat_met <- function(bv, batch, group = NULL, covar_mod = NULL, full_mod = TRU
   }
   
   ## Check for missing values in count matrix
-  NAs = any(is.na(bv))
-  if (NAs) {cat(c('Found', sum(is.na(bv)), 'missing data values\n'), sep = ' ')}
+  NAs = any(is.na(vmat))
+  if (NAs) {cat(c('Found', sum(is.na(vmat)), 'missing data values\n'), sep = ' ')}
+  
+  ## convert M-values to beta-values if needed
+  if (dtype == "b-value") {
+    bv <- vmat
+  } else {
+    bv <- exp(vmat) / (1 + exp(vmat))
+  }
   
   ########  Estimate parameters from beta GLM  ########
   cat("Fitting the GLM model\n")
@@ -382,9 +404,14 @@ ComBat_met <- function(bv, batch, group = NULL, covar_mod = NULL, full_mod = TRU
                                                             new_phi = new_phi)
   }
   
-  ## Add back features with beta-values unqualified for beta regression  
+  ## Add back features with values unqualified for beta regression  
   ## so that dimensions won't change
-  adj_bv <- bvOri
-  adj_bv[keep, ] <- adj_bv_raw
-  return(adj_bv)
+  if (dtype == "b-value") {
+    adj_vmat <- vmatOri
+    adj_vmat[keep, ] <- adj_bv_raw
+  } else {
+    adj_vmat <- vmatOri
+    adj_vmat[keep, ] <- log(adj_bv_raw / (1 - adj_bv_raw))
+  }
+  return(adj_vmat)
 }

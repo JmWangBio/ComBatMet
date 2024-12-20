@@ -5,7 +5,8 @@
 \title{Adjust for batch effects in DNA methylation data by converting beta-values to M-values followed by ComBat}
 \usage{
 Mvalue_ComBat(
-  bv,
+  vmat,
+  dtype = c("b-value", "M-value"),
   batch,
   group = NULL,
   covar_mod = NULL,
@@ -16,7 +17,9 @@ Mvalue_ComBat(
 )
 }
 \arguments{
-\item{bv}{matrix of beta-values}
+\item{vmat}{matrix of beta-values or M-values}
+
+\item{dtype}{data type: beta-values or M-values; note that the input and output have the same data type.}
 
 \item{batch}{vector for batch}
 
@@ -29,17 +32,18 @@ Mvalue_ComBat(
 \item{mean.only}{Boolean variable indicating whether to apply EB-shrinkage on the estimation of dispersion effects}
 
 \item{pseudo_beta}{pseudo beta-values to be used for replacing extreme 0 and 1 beta-values.
-Value needs to be between 0 and 0.5.}
+Value needs to be between 0 and 0.5. Only active when data type is beta-values.}
 
 \item{ref.batch}{NULL by default. If given, that batch will be selected as a reference for batch correction.}
 }
 \value{
-\code{Mvalue_ComBat} returns a feature x sample beta-value matrix, adjusted for batch effects.
+\code{Mvalue_ComBat} returns a feature x sample matrix with the same data type as input, adjusted for batch effects.
 }
 \description{
 Mvalue_ComBat converts beta-values to M-values through logit-transformation,
 adjusts M-values for batch effects using ComBat, and converts the adjusted M-values back to
 adjusted beta-values through reverse logit-transformation.
+Forward and reverse logit-transformation are omitted if M-values are provided.
 }
 \examples{
 # Generate a random beta-value matrix
@@ -48,8 +52,17 @@ batch <- c(rep(1, 4), rep(2, 4))
 group <- rep(c(0, 1), 4)
 
 # Adjust for batch effects including biological conditions
-adj_bv_mat <- Mvalue_ComBat(bv_mat, batch = batch, group = group, full_mod = TRUE)
+adj_bv_mat <- Mvalue_ComBat(bv_mat, dtype = "b-value", batch = batch, group = group, full_mod = TRUE)
 # Adjust for batch effects without including biological conditions
-adj_bv_mat <- Mvalue_ComBat(bv_mat, batch = batch, group = group, full_mod = FALSE)
+adj_bv_mat <- Mvalue_ComBat(bv_mat, dtype = "b-value", batch = batch, group = group, full_mod = FALSE)
 
+# Generate a random M-value matrix
+mv_mat <- matrix(rnorm(n = 400, mean = 0, sd = 1), nrow = 50, ncol = 8)
+batch <- c(rep(1, 4), rep(2, 4))
+group <- rep(c(0, 1), 4)
+
+# Adjust for batch effects including biological conditions
+adj_mv_mat <- Mvalue_ComBat(mv_mat, dtype = "M-value", batch = batch, group = group, full_mod = TRUE)
+# Adjust for batch effects without including biological conditions
+adj_mv_mat <- Mvalue_ComBat(mv_mat, dtype = "M-value", batch = batch, group = group, full_mod = FALSE)
 }
