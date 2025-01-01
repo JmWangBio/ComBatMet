@@ -1,17 +1,94 @@
+ComBatMet
+================
+Junmin Wang
+12/31/2024
 
-# ComBatMet
+This page aims to present ComBat-met in an accessible way for a broad 
+audience. For those interested in implementing ComBat-met or reproducing 
+the results in the manuscript, detailed prerequisites and code descriptions are 
+provided at the bottom of this page.
 
-<!-- badges: start -->
-<!-- badges: end -->
+## Introduction
 
-ComBatMet (ComBat-met) is a regression framework to adjust batch effects in DNA methylation studies. 
-This package includes three batch correction methods. ComBat-met fits beta regression models to the 
-beta-values, calculates batch-free distributions, and maps the quantiles of the estimated distributions 
-to their batch-free counterparts. M-value ComBat log-transforms beta values to M-values prior to applying batch 
-correction via ComBat. ComBat-biseq fits beta-binomial regression models to the bisulfite sequencing data 
-followed by a batch correction procedure similar to ComBat-met.
+Integration of genomics data is frequently impeded by technical artifacts, commonly 
+referred to as batch effects. While many batch correction methods are available, they 
+often fail to adequately account for the unique properties of DNA methylation data. 
 
-## Installation
+To  address this limitation, we developed **ComBat-met**, a novel batch adjustment framework 
+specifically tailored for methylation studies. This method employs a beta regression model 
+to estimate batch-free distributions, and realigns quantiles of the data to their corrected 
+counterparts, providing robust adjustment for technical variations (see Fig. 1 for details of 
+the workflow).
+
+<div align="center">
+  <img src="images/Fig1.png" alt="Wf" width="800"/>
+</div>
+
+**Fig. 1.** Overview of the ComBat-met workflow.
+
+## Benchmarking
+
+We compared ComBat-met to existing batch adjustment methods using simulated methylation 
+datasets with known ground truth. Each method was applied under identical conditions, and 
+their ability to remove batch effects while preserving biological variability was assessed. 
+Below is a description of the methods included in the comparison besides ComBat-met: 
+
+- **M-value ComBat**: Beta values are log-transformed into M-values, and batch correction 
+is performed using ComBat.
+- **SVA (Surrogate Variable Analysis)**: Beta values are log-transformed into M-values, 
+followed by batch correction using SVA.
+- **Including Batch as a Covariate in DE**: Batch is explicitly included as a covariate 
+during differential expression analysis to account for technical variation.
+- **ComBat-biseq**: Uses beta-binomial regression to estimate batch-free distributions of 
+bisulfite sequencing data and correct batch effects.
+
+The results demonstrated that ComBat-met consistently outperformed others in reducing 
+batch-induced variability while preserving biological variability (Fig. 2).
+
+<div align="center">
+  <img src="images/Fig2.png" alt="benchmark" width="700"/>
+</div>
+
+**Fig. 2.** Median true positive rates and false positive rates calculated based on 
+simulated data.
+
+## Application to TCGA Data
+
+We applied ComBat-met to methylation data from TCGA and compared its performance to other 
+batch correction methods by analyzing the percentage of variation explained by batch effects. 
+Results showed that ComBat-met consistently achieved the smallest percentage of batch-associated 
+variation in both normal and tumor samples (Fig. 3).
+
+<div align="center">
+  <img src="images/Fig3.png" alt="TCGA" width="800"/>
+</div>
+<br>
+
+**Fig. 3.** Percentage of variation explained by batch.
+
+To demonstrate the importance of batch adjustment, we also evaluated the performance of a 
+**neural network** classifier both **before** and **after** applying ComBat-met. For this 
+analysis:
+
+- We selected three random methylation features in each iteration to simulate a minimal 
+and unbiased feature set, avoiding cherry-picking variables that might artificially boost 
+performance.
+- A feed-forward, fully connected neural network with two hidden layers was trained to 
+classify normal and cancerous samples.
+- Accuracy was calculated for models trained on unadjusted data and batch-adjusted data.
+- By repeating this process across iterations, we observed that batch adjustment by ComBat-met 
+consistently improved classification accuracy, emphasizing the importance of effective batch 
+correction in methylation studies (Fig. 4).
+
+<div align="center">
+  <img src="images/Fig4.png" alt="ML" width="800"/>
+</div>
+<br>
+
+**Fig. 4.** Architecture of the neural network used for classification; jitter plot comparing 
+classification accuracy before and after batch adjustment using ComBat-met.
+
+## Installation and Usage
 
 You can install ComBatMet like so:
 
@@ -21,13 +98,10 @@ install_github("JmWangBio/ComBatMet")
 ```
 
 Next, I will provide an example to demonstrate how to get started with this package.
-
-## Example 
-
-In this example, I will show how ComBatMet can be applied to batch correct the DNA methylation data. 
-First, let’s simulate some DNA methylation data. Suppose that in a hypothetical methylation study of cancer, 
-50 probes/sites are quantified. The diseased group (i.e., D) and healthy group (i.e. H) has four replicates each. 
-Two replicates belong to batch 1, and the other two replicates, batch 2.
+First, let’s simulate some DNA methylation data. Suppose that in a hypothetical methylation 
+study of cancer, 50 probes/sites are quantified. The diseased group (i.e., D) and healthy 
+group (i.e., H) has four replicates each. Two replicates belong to batch 1, and the other 
+two replicates, batch 2.
 
 ``` r
 # Load library
@@ -49,20 +123,91 @@ adj_bv_mat <- ComBat_met(bv_mat, batch = batch, group = group, full_mod = TRUE)
 adj_bv_mat <- ComBat_met(bv_mat, batch = batch, group = group, full_mod = FALSE)
 ```
 
-## Data Analysis
+## Code Descriptions
 
 Scripts used for generating the simulated data and analysing the data 
 from the TCGA data as shown in the manuscript are stored in the “inst” folder.
 
-Scripts inside the "simulation" subfolder are used to generate and analyze the simulated data. 
-To compare different batch correction workflows, run "dataSim_all_DE_pipeline.R" followed by 
-"analyze_all_DE_data.R". To understand how sample size affects the true and false positive rates 
-of ComBat-biseq, run "dataSim_biseq_lrt_pipeline.R" followed by "analyze_biseq_lrt_data.R".
+<table>
+  <thead>
+    <tr>
+      <th>Purpose</th>
+      <th>Folder</th>
+      <th>File name</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td rowspan="2">
+        <div>Benchmarking with simulation data</div>
+      </td>
+      <td rowspan="2">
+        <div>simulation/</div>
+      </td>
+      <td>dataSim_all_DE_pipeline.R<br>dataSim_biseq_lrt_pipeline.R</td>
+      <td>simulation of methylation or bisulfite sequencing data followed by differential methylation analysis</td>
+    </tr>
+    <tr>
+      <td>analyze_all_DE_data.R<br>analyze_biseq_lrt_data.R</td>
+      <td>calculating the true and false positive rates of each workflow</td>
+    </tr>
+    <tr>
+      <td rowspan="10">
+        <div>Benchmarking with TCGA data</div>
+      </td>
+      <td rowspan="7">
+        <div>TCGA/</div>
+      </td>
+      <td>download_TCGA_data.R</td>
+      <td>downloading the breast cancer subtype data</td>
+    </tr>
+    <tr>
+      <td>gene_all_NT_pipeline.R<br>gene_LumB_TP_pipeline.R</td>
+      <td>adjusting the gene-level data for batch effects in normal and tumor samples</td>
+    </tr>
+    <tr>
+      <td>site_all_NT_pipeline.R<br>site_LumB_TP_pipeline.R</td>
+      <td>adjusting the site-level data for batch effects in normal and tumor samples</td>
+    </tr>
+    <tr>
+      <td>dea_and_pwa.R</td>
+      <td>conducting differential methylation analysis followed by pathway analysis</td>
+    </tr>
+    <tr>
+      <td>plot_gene_box.R</td>
+      <td>making box plots of beta-values</td>
+    </tr>
+    <tr>
+      <td>plot_gene_pca.R</td>
+      <td>making PCA plots</td>
+    </tr>
+    <tr>
+      <td>plot_gene_perc_explained_variation.R<br>plot_site_perc_explained_variation.R</td>
+      <td>making violin plots for % variation explained by batch in the gene-level and site-level data</td>
+    </tr>
+    <tr>
+      <td rowspan="3">
+        <div>ML/</div>
+      </td>
+      <td>TCGA_extract_metadata.R</td>
+      <td>extracting metadata for samples (normal or cancerous)</td>
+    </tr>
+    <tr>
+      <td>ML.py</td>
+      <td>evaluating the impact of batch adjustment on classification by repeatedly selecting random features, training a neural network, and comparing accuracies before and after batch correction</td>
+    </tr>
+    <tr>
+      <td>visualization.py</td>
+      <td>making a jitter plot to visualize accuracies before and after batch adjustment</td>
+    </tr>
+  </tbody>
+</table>
 
-Scripts inside the "TCGA" subfolder are used to download and analyze the TCGA data. 
-Run "download_TCGA_data.R" to download the breast cancer subset data. "gene_all_NT_pipeline.R" and 
-"gene_LumB_TP_pipeline.R" adjust the gene-level data for batch effects, while "site_all_NT_pipeline.R" 
-and "site_LumB_TP_pipeline.R", the site-level data. "dea_and_pwa.R" conducts the differential expression 
-analysis followed by pathway analysis. "plot_gene_box.R" makes the box plots of beta-values. "plot_gene_PCA.R" 
-makes the PCA plots. "plot_gene_perc_explained_variation.R" and "plot_site_perc_explained_variation.R" make 
-violin plots for % variation explained by batch in the gene-level and site-level data, respectively.
+## Contribute
+
+We welcome your feedback and contributions! If you have suggestions, find an issue, or want to add new features, feel free to open an issue or submit a pull request. Together, we can make this project even better!
+
+## References
+
+- Wang J. ComBat-met: Adjusting Batch Effects in DNA Methylation Data. *bioRxiv* 2024.08.13.607838.
