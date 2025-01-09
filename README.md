@@ -1,7 +1,7 @@
 ComBatMet
 ================
 Junmin Wang
-12/31/2024
+01/09/2025
 
 This page aims to present ComBat-met in an accessible way for a broad 
 audience. For those interested in implementing ComBat-met or reproducing 
@@ -41,6 +41,9 @@ followed by batch correction using SVA.
 during differential expression analysis to account for technical variation.
 - **ComBat-biseq**: Uses beta-binomial regression to estimate batch-free distributions of 
 bisulfite sequencing data and correct batch effects.
+- **BEclear**: Uses latent factor models to detect and correct batch effects.
+- **RUVm (Removing Unwanted Variation)**: Uses the two-stage RUVm approach to correct 
+batch effects.
 
 The results demonstrated that ComBat-met consistently outperformed others in reducing 
 batch-induced variability while preserving biological variability (Fig. 2).
@@ -153,10 +156,10 @@ from the TCGA data as shown in the manuscript are stored in the “inst” folde
       <td>calculating the true and false positive rates of each workflow</td>
     </tr>
     <tr>
-      <td rowspan="10">
+      <td rowspan="9">
         <div>Benchmarking with TCGA data</div>
       </td>
-      <td rowspan="7">
+      <td rowspan="6">
         <div>TCGA/</div>
       </td>
       <td>download_TCGA_data.R</td>
@@ -171,16 +174,12 @@ from the TCGA data as shown in the manuscript are stored in the “inst” folde
       <td>adjusting the site-level data for batch effects in normal and tumor samples</td>
     </tr>
     <tr>
-      <td>dea_and_pwa.R</td>
-      <td>conducting differential methylation analysis followed by pathway analysis</td>
-    </tr>
-    <tr>
-      <td>plot_gene_box.R</td>
+      <td>plot_site_box.R</td>
       <td>making box plots of beta-values</td>
     </tr>
     <tr>
-      <td>plot_gene_pca.R</td>
-      <td>making PCA plots</td>
+      <td>plot_gene_pca.R<br>plot_site_pca.R</td>
+      <td>making PCA plots for the gene-level and site-level data</td>
     </tr>
     <tr>
       <td>plot_gene_perc_explained_variation.R<br>plot_site_perc_explained_variation.R</td>
