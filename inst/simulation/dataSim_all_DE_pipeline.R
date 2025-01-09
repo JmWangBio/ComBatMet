@@ -1,13 +1,13 @@
 
 ## Author: Junmin Wang
-## Date: July 18th, 2024
-## IMPORTANT NOTE: To run this script successfully, you need to have the dplyr, methylKit, methylSig, DSS, emdbook, limma, and sva R packages installed.
-## Make sure to change the path of the output to where you want to save it (line 197).
-## Also, please make sure to provide the correct paths to "dataSim_custom.R" and "diff_met_wf.R" (lines 21 and 22).
-## This script can be used to simulate bisulfite sequencing data with varying mean and dispersion batch effects.
+## Date: January 8th, 2025
+## IMPORTANT NOTE: To run this script successfully, you need to have the dplyr, methylKit, methylSig, DSS, emdbook, limma, sva, BEclear, and missMethyl R packages installed.
+## Make sure to change the path of the output to where you want to save it.
+## Also, please make sure to provide the correct paths to "dataSim_custom.R", "diff_met_wf.R", "apply_BEclear.R", and "apply_RUVm_DE.R"
+## This script can be used to simulate bisulfite sequencing data with varying mean and dispersion (precision) batch effects.
 ## The simulated data are adjusted for batch effects using different methods followed by diff. met. analysis.
 ## Beware that running 1000 simulations requires lots of computing power, so using a high performance computing environment is strongly recommended.
-## To run fewer simulations, change "Nsims" from 1000 to 1 (line 29).
+## To run fewer simulations, change "Nsims" from 1000 to 1.
 
 ## load libraries
 library(dplyr)
@@ -16,10 +16,14 @@ library(methylSig)
 library(DSS)
 library(limma)
 library(ComBatMet)
+library(BEclear)
+library(missMethyl)
 
 ## load simulation functions
-source("path/to/dataSim_custom.R")
-source("path/to/diff_met_wf.R")
+source("path/to/inst/simulation/dataSim_custom.R")
+source("path/to/inst/simulation/diff_met_wf.R")
+source("path/to/inst/simulation/helper/apply_BEclear.R")
+source("path/to/inst/simulation/helper/apply_RUVm_DE.R")
 
 ## variables
 batch_effect_lst <- c(0, 2, 5, 10)
@@ -94,6 +98,12 @@ for (j in 1:Nsims) {
                                      group = treatment, 
                                      full_mod = TRUE)
       
+      # BEclear
+      cat("Running BEclear...\n")
+      beta.dat.beclear <- apply_BEclear(beta.dat,
+                                        batch = batch,
+                                        group = treatment)
+      
       ###########################################
       #### differential methylation analysis ####
       ###########################################
@@ -140,6 +150,18 @@ for (j in 1:Nsims) {
                                 pseudo_beta = 1e-4,
                                 eb = FALSE)
       
+      ## BEclear + t-test
+      cat("Running t-test on results from BEclear...\n")
+      beclear.de.res <- diff_met_wf(beta.dat.beclear,
+                                    group = treatment,
+                                    contrast.pair = "group1-group0",
+                                    pseudo_beta = 1e-4,
+                                    eb = FALSE)
+      
+      ## RUVm + t-test
+      ruvm.de.res <- apply_RUVm_DE(beta.dat,
+                                   group = treatment)
+      
       ## ComBat-biseq + likelihood ratio test
       cat("Running MethylSig on results from ComBat-biseq...\n")
       adj.BS.dat.lst <- lapply(1:ncol(numCs.dat.cbbs), function(i) {
@@ -175,7 +197,11 @@ for (j in 1:Nsims) {
                              mutate(method = "ComBat-Met + t-test"),
                            data.frame(id = 1:nrow(beta.dat), pval = diff_gr$pvalue) %>% 
                              mutate(adj.pval = p.adjust(pval, method = "BH"),
-                                    method = "ComBat-biseq + lrt")) %>%
+                                    method = "ComBat-biseq + lrt"),
+                           beclear.de.res[, c("id", "pval", "adj.pval")] %>%
+                             mutate(method = "BEclear + t-test"),
+                           ruvm.de.res[, c("id", "pval", "adj.pval")] %>%
+                             mutate(method = "RUVm + t-test")) %>%
         inner_join(data.frame(id = 1:nrow(beta.dat),
                               TP = ifelse(1:nrow(beta.dat) %in% my.methyldata[[2]], 
                                           TRUE, FALSE)),

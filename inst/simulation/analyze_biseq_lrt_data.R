@@ -1,6 +1,6 @@
 
 ## Author: Junmin Wang
-## Date: July 18th, 2024
+## Date: January 8th, 2025
 ## This script takes simulated p-values as input and calculates the TPR and FPR of the lrt applied to the simulated data of different sample sizes.
 ## IMPORTANT NOTE: To run this script successfully, you need to have the dplyr and ggplot2 R packages installed.
 ## Make sure to change the path of input to where you have saved it (line 13).
@@ -34,10 +34,10 @@ rate.averaged.reformatted <- rate.averaged %>%
                              batch_effect == '2' ~ 'Mean batch\npercent change 2%',
                              batch_effect == '5' ~ 'Mean batch\npercent change 5%',
                              batch_effect == '10' ~ 'Mean batch\npercent change 10%'),
-    disp_batch_effect = case_when(disp_batch_effect == '1' ~ 'No dispersion\nbatch effect',
-                                  disp_batch_effect == '2' ~ 'Dispersion batch\nfold change 2',
-                                  disp_batch_effect == '5' ~ 'Dispersion batch\nfold change 5',
-                                  disp_batch_effect == '10' ~ 'Dispersion batch\nfold change 10'),
+    disp_batch_effect = case_when(disp_batch_effect == '1' ~ 'No precision\nbatch effect',
+                                  disp_batch_effect == '2' ~ 'Precision batch\nfold change 2',
+                                  disp_batch_effect == '5' ~ 'Precision batch\nfold change 5',
+                                  disp_batch_effect == '10' ~ 'Precision batch\nfold change 10'),
     num.rep = paste(num.rep, "samples"),
     batch_effect = factor(batch_effect, 
                           levels = c("No mean\nbatch effect",
@@ -45,10 +45,10 @@ rate.averaged.reformatted <- rate.averaged %>%
                                      "Mean batch\npercent change 5%",
                                      "Mean batch\npercent change 10%")),
     disp_batch_effect = factor(disp_batch_effect,
-                        levels = c("No dispersion\nbatch effect",
-                                   "Dispersion batch\nfold change 2",
-                                   "Dispersion batch\nfold change 5",
-                                   "Dispersion batch\nfold change 10")),
+                        levels = c("No precision\nbatch effect",
+                                   "Precision batch\nfold change 2",
+                                   "Precision batch\nfold change 5",
+                                   "Precision batch\nfold change 10")),
     num.rep = factor(num.rep, levels = c("20 samples", 
                                          "100 samples"))
   )

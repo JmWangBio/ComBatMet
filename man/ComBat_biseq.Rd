@@ -45,11 +45,11 @@ calculates batch-free distributions, and maps the quantiles of the estimated dis
 to their batch-free counterparts.
 }
 \examples{
-library(methylKit)
+if (requireNamespace("methylKit", quietly = TRUE)) {
 # Simulate bisulfite sequencing data
-my.methylBase <- dataSim(replicates = 8, sites = 50, treatment = c(1,1,1,1,0,0,0,0),
-                         percentage = 10, effect = 25, add.info = TRUE)
-my.methylData <- getData(my.methylBase[[1]])
+my.methylBase <- methylKit::dataSim(replicates = 8, sites = 50, treatment = c(1,1,1,1,0,0,0,0), 
+percentage = 10, effect = 25, add.info = TRUE)
+my.methylData <- methylKit::getData(my.methylBase[[1]])
 coverage_mat <- as.matrix(my.methylData[, grep("coverage", colnames(my.methylData))])
 class(coverage_mat) <- "numeric"
 numCs_mat <- as.matrix(my.methylData[, grep("numCs", colnames(my.methylData))])
@@ -63,5 +63,6 @@ group = group, full_mod = TRUE)
 # Adjust for batch effects without including biological conditions
 adj_numCs_mat <- ComBat_biseq(numCs = numCs_mat, coverage = coverage_mat, batch = batch, 
 group = group, full_mod = FALSE)
+}
 
 }

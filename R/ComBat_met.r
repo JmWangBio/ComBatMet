@@ -5,7 +5,7 @@
 #' to their batch-free counterparts.
 #'
 #' @param vmat matrix of beta-values or M-values
-#' @param dtype data type: beta-values or M-values; note that the input and output have the same data type.
+#' @param dtype data type: b-value or M-value; note that the input and output have the same data type.
 #' @param batch vector for batch
 #' @param group optional vector for biological condition of interest
 #' @param covar_mod optional model matrix representing co-variates to be included in the model
@@ -41,7 +41,7 @@
 #' # Adjust for batch effects without including biological conditions
 #' adj_mv_mat <- ComBat_met(mv_mat, dtype = "M-value", batch = batch, group = group, full_mod = FALSE)
 
-ComBat_met <- function(vmat, dtype = c("b-value", "M-value"), 
+ComBat_met <- function(vmat, dtype = "b-value", 
                        batch, group = NULL, covar_mod = NULL, full_mod = TRUE,
                        shrink = FALSE, mean.only = FALSE, feature.subset.n = NULL,
                        pseudo_beta = 1e-4, ref.batch = NULL) {

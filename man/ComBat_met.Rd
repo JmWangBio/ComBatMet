@@ -6,7 +6,7 @@
 \usage{
 ComBat_met(
   vmat,
-  dtype = c("b-value", "M-value"),
+  dtype = "b-value",
   batch,
   group = NULL,
   covar_mod = NULL,
@@ -21,7 +21,7 @@ ComBat_met(
 \arguments{
 \item{vmat}{matrix of beta-values or M-values}
 
-\item{dtype}{data type: beta-values or M-values; note that the input and output have the same data type.}
+\item{dtype}{data type: b-value or M-value; note that the input and output have the same data type.}
 
 \item{batch}{vector for batch}
 
@@ -67,7 +67,7 @@ batch <- c(rep(1, 4), rep(2, 4))
 group <- rep(c(0, 1), 4)
 
 # Adjust for batch effects including biological conditions
-adj_bv_mat <- ComBat_met(mv_mat, dtype = "M-value", batch = batch, group = group, full_mod = TRUE)
+adj_mv_mat <- ComBat_met(mv_mat, dtype = "M-value", batch = batch, group = group, full_mod = TRUE)
 # Adjust for batch effects without including biological conditions
-adj_bv_mat <- ComBat_met(mv_mat, dtype = "M-value", batch = batch, group = group, full_mod = FALSE)
+adj_mv_mat <- ComBat_met(mv_mat, dtype = "M-value", batch = batch, group = group, full_mod = FALSE)
 }

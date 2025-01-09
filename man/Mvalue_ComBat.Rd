@@ -6,7 +6,7 @@
 \usage{
 Mvalue_ComBat(
   vmat,
-  dtype = c("b-value", "M-value"),
+  dtype = "b-value",
   batch,
   group = NULL,
   covar_mod = NULL,
@@ -19,7 +19,7 @@ Mvalue_ComBat(
 \arguments{
 \item{vmat}{matrix of beta-values or M-values}
 
-\item{dtype}{data type: beta-values or M-values; note that the input and output have the same data type.}
+\item{dtype}{data type: b-value or M-value; note that the input and output have the same data type.}
 
 \item{batch}{vector for batch}
 

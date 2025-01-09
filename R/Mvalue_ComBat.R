@@ -31,7 +31,7 @@
 #' # Adjust for batch effects without including biological conditions
 #' adj_mv_mat <- Mvalue_ComBat(mv_mat, dtype = "M-value", batch = batch, group = group, full_mod = FALSE)
 
-Mvalue_ComBat <- function(vmat, dtype = c("b-value", "M-value"), 
+Mvalue_ComBat <- function(vmat, dtype = "b-value", 
                           batch, group = NULL, 
                           covar_mod = NULL, full_mod = TRUE, 
                           mean.only = FALSE, pseudo_beta = 1e-4,
