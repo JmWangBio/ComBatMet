@@ -20,6 +20,7 @@ Imports:
     betareg,
     aod,
     updog,
-    sva
+    sva,
+    parallel
 Suggests:
     methylKit

@@ -29,6 +29,9 @@ rate.averaged <- rate.total %>%
 
 ## plot median tpr and fpr for each combination of mean and dispersion batch effects
 rate.averaged.reformatted <- rate.averaged %>%
+  filter(method %in% c("SVA + t-test", "covariate in t-test", "ComBat-Met + t-test",
+                       "M-value ComBat + t-test", "raw + t-test", "ComBat-biseq + lrt",
+                       "BEclear + t-test", "RUVm + t-test")) %>%
   mutate(
     batch_effect = case_when(batch_effect == '0' ~ 'No mean\nbatch effect',
                              batch_effect == '2' ~ 'Mean batch\npercent change 2%',
@@ -67,6 +70,39 @@ rate.averaged.reformatted <- rate.averaged %>%
                                "RUVm"))
   )
 
+rate.averaged.reformatted.shrink <- rate.averaged %>%
+  filter(method %in% c("ComBat-Met + t-test", "ComBat-biseq + lrt",
+                       "ComBat-Met (shrink) + t-test", "ComBat-biseq (shrink) + lrt")) %>%
+  mutate(
+    batch_effect = case_when(batch_effect == '0' ~ 'No mean\nbatch effect',
+                             batch_effect == '2' ~ 'Mean batch\npercent change 2%',
+                             batch_effect == '5' ~ 'Mean batch\npercent change 5%',
+                             batch_effect == '10' ~ 'Mean batch\npercent change 10%'),
+    disp_batch_effect = case_when(disp_batch_effect == '1' ~ 'No precision\nbatch effect',
+                                  disp_batch_effect == '2' ~ 'Precision batch\nfold change 2',
+                                  disp_batch_effect == '5' ~ 'Precision batch\nfold change 5',
+                                  disp_batch_effect == '10' ~ 'Precision batch\nfold change 10'),
+    method = case_when(method == 'ComBat-Met + t-test' ~ 'ComBat-met without shrinkage',
+                       method == 'ComBat-biseq + lrt' ~ 'ComBat-biseq without shrinkage',
+                       method == 'ComBat-Met (shrink) + t-test' ~ 'ComBat-met with shrinkage',
+                       method == 'ComBat-biseq (shrink) + lrt' ~ 'ComBat-biseq with shrinkage'),
+    batch_effect = factor(batch_effect, 
+                          levels = c("No mean\nbatch effect",
+                                     "Mean batch\npercent change 2%",
+                                     "Mean batch\npercent change 5%",
+                                     "Mean batch\npercent change 10%")),
+    disp_batch_effect = factor(disp_batch_effect,
+                               levels = c("No precision\nbatch effect",
+                                          "Precision batch\nfold change 2",
+                                          "Precision batch\nfold change 5",
+                                          "Precision batch\nfold change 10")),
+    method = factor(method,
+                    levels = c("ComBat-met without shrinkage",
+                               "ComBat-biseq without shrinkage",
+                               "ComBat-met with shrinkage",
+                               "ComBat-biseq with shrinkage"))
+  )
+
 ## make plot
 p1 <- ggplot(data = rate.averaged.reformatted,
              aes(x = fpr_median, y = tpr_median, color = method,
@@ -89,3 +125,27 @@ p1 <- ggplot(data = rate.averaged.reformatted,
        y = "True Positive Rate (TPR)") +
   scale_x_continuous(limits = c(0, 0.17)) +
   scale_shape_manual(values = 1:8)
+
+p2 <- ggplot(data = rate.averaged.reformatted.shrink,
+             aes(x = fpr_median, y = tpr_median, color = method,
+                 shape = method)) +
+  geom_point(size = 4) +
+  facet_grid(disp_batch_effect ~ batch_effect) +
+  geom_vline(xintercept = 0.05, linetype = "dashed", color = "lightgray") +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        panel.background = element_blank(), 
+        axis.line = element_line(colour = "black"),
+        legend.title = element_blank(),
+        axis.text.x = element_text(color = "black"),
+        axis.text.y = element_text(color = "black"),
+        panel.spacing = unit(1, "lines"),
+        legend.position = "bottom") +
+  geom_rect(xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = Inf,
+            colour = "black", fill = NA, inherit.aes = FALSE) +
+  labs(x = "False Positive Rate (FPR)",
+       y = "True Positive Rate (TPR)") +
+  scale_x_continuous(limits = c(0, 0.17)) +
+  scale_y_continuous(limits = c(0.28, 0.82)) +
+  scale_shape_manual(values = 1:4) +
+  guides(shape = guide_legend(nrow = 2))

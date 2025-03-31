@@ -32,11 +32,15 @@
 #' # Adjust for batch effects without including biological conditions
 #' adj_numCs_mat <- ComBat_biseq(numCs = numCs_mat, coverage = coverage_mat, batch = batch, 
 #' group = group, full_mod = FALSE)
+#' # Adjust for batch effects including biological conditions (multiple threads)
+#' adj_numCs_mat <- ComBat_biseq(numCs = numCs_mat, coverage = coverage_mat, batch = batch, 
+#' group = group, full_mod = TRUE, ncores = 2)
 #' }
 #' 
 
 ComBat_biseq <- function(numCs, coverage, batch, group = NULL, covar_mod = NULL, full_mod = TRUE, 
-                         shrink = FALSE, mean.only = FALSE, feature.subset.n = NULL) {  
+                         shrink = FALSE, mean.only = FALSE, feature.subset.n = NULL,
+                         ncores = 1) {  
   ########  Preparation  ########
   ## Check if coverage and numCs are the same size
   if (!all(dim(coverage) == dim(numCs))) {
@@ -177,16 +181,19 @@ ComBat_biseq <- function(numCs, coverage, batch, group = NULL, covar_mod = NULL,
   
   ########  Estimate parameters from beta-binomial GLM  ########
   cat("Fitting the GLM model\n")
-  gamma_hat_lst <- vector("list", length = nrow(coverage))
-  mu_hat_lst <- vector("list", length = nrow(coverage))
-  phi_hat_lst <- vector("list", length = nrow(coverage))
-  delta_hat_lst <- vector("list", length = nrow(coverage))
-  n_zero_modvar <- 0
+
+  if (!is.numeric(ncores) || ncores != as.integer(ncores) || ncores <= 0) {
+    stop("ncores must be a positive integer.")
+  }
+  num_cores <- max(1, parallel::detectCores() - 1)
+  num_cores <- min(ncores, num_cores)
+  cl <- parallel::makeCluster(num_cores)
   
-  for (k in 1:nrow(coverage)) {
-    if (k %% 1000 == 0) {
-      cat(sprintf("%s features processed\n", k))
-    }
+  # define the function to be applied in parallel
+  param_estim <- function(k) {
+    result <- list(gamma_hat = NULL, mu_hat = NULL, phi_hat = NULL, delta_hat = NULL,
+                   zero_modvar = 0)
+    
     # mark rows with NA values and zero coverage
     full_mat <- as.data.frame(cbind(design, 
                                     coverage = coverage[k, ], 
@@ -197,15 +204,15 @@ ComBat_biseq <- function(numCs, coverage, batch, group = NULL, covar_mod = NULL,
     
     # check if the data are all NAs
     if (length(nona) == 0) {
-      n_zero_modvar <- n_zero_modvar + 1
-      next
+      result$zero_modvar <- 1
+      return(result)
     }
     
     # check if the model has zero model variance
     full_ratio <- full_mat$numCs / full_mat$coverage
     if (qr(cbind(full_mat[, 1:(ncol(full_mat) - 2)], full_ratio)[nona, ])$rank < ncol(full_mat) - 1)  {
-      n_zero_modvar <- n_zero_modvar + 1
-      next
+      result$zero_modvar <- 1
+      return(result)
     }
     
     # model fit
@@ -244,11 +251,22 @@ ComBat_biseq <- function(numCs, coverage, batch, group = NULL, covar_mod = NULL,
     }
     
     # store result
-    gamma_hat_lst[[k]] <- gamma_hat
-    mu_hat_lst[[k]] <- mu_hat
-    phi_hat_lst[[k]] <- phi_hat
-    delta_hat_lst[[k]] <- delta_hat
+    result$gamma_hat <- gamma_hat
+    result$mu_hat <- mu_hat
+    result$phi_hat <- phi_hat
+    result$delta_hat <- delta_hat
+    return(result)
   }
+  
+  # run in parallel
+  result_lst <- parallel::parLapply(cl, 1:nrow(coverage), param_estim)
+  parallel::stopCluster(cl)
+  
+  gamma_hat_lst <- lapply(result_lst, function(x) x$gamma_hat)
+  mu_hat_lst <- lapply(result_lst, function(x) x$mu_hat)
+  phi_hat_lst <- lapply(result_lst, function(x) x$phi_hat)
+  delta_hat_lst <- lapply(result_lst, function(x) x$delta_hat)
+  n_zero_modvar <- sum(unlist(lapply(result_lst, function(x) x$zero_modvar)))
   
   cat(sprintf("Found %s features with zero model variance;
               these features won't be adjusted for batch effects.\n",
@@ -278,7 +296,8 @@ ComBat_biseq <- function(numCs, coverage, batch, group = NULL, covar_mod = NULL,
                            gamma = gamma_hat_mat[, ii],
                            phi = phi_hat_mat[, batches_ind[[ii]]],
                            delta = delta_hat_mat[, ii],
-                           feature.subset.n = feature.subset.n)
+                           feature.subset.n = feature.subset.n,
+                           ncores = num_cores)
       } else {
         invisible(utils::capture.output(mcres <- mcint_fun(numCs.dat = numCs[, batches_ind[[ii]]],
                                                            coverage.dat = coverage[, batches_ind[[ii]]],
@@ -286,7 +305,8 @@ ComBat_biseq <- function(numCs, coverage, batch, group = NULL, covar_mod = NULL,
                                                            gamma = gamma_hat_mat[, ii],
                                                            phi = phi_hat_mat[, batches_ind[[ii]]],
                                                            delta = delta_hat_mat[, ii],
-                                                           feature.subset.n = feature.subset.n)))
+                                                           feature.subset.n = feature.subset.n,
+                                                           ncores = num_cores)))
       }
       return(mcres)
     })

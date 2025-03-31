@@ -13,7 +13,8 @@ ComBat_biseq(
   full_mod = TRUE,
   shrink = FALSE,
   mean.only = FALSE,
-  feature.subset.n = NULL
+  feature.subset.n = NULL,
+  ncores = 1
 )
 }
 \arguments{
@@ -34,6 +35,8 @@ ComBat_biseq(
 \item{mean.only}{Boolean variable indicating whether to apply EB-shrinkage on the estimation of dispersion effects}
 
 \item{feature.subset.n}{number of features to use in non-parametric EB estimation, only useful when shrink equals TRUE}
+
+\item{ncores}{number of cores to be used for parallel computing. By default, ncores is set to one.}
 }
 \value{
 \code{ComBat_biseq} returns a batch-adjusted feature x sample count matrix, representing number
@@ -63,6 +66,9 @@ group = group, full_mod = TRUE)
 # Adjust for batch effects without including biological conditions
 adj_numCs_mat <- ComBat_biseq(numCs = numCs_mat, coverage = coverage_mat, batch = batch, 
 group = group, full_mod = FALSE)
+# Adjust for batch effects including biological conditions (multiple threads)
+adj_numCs_mat <- ComBat_biseq(numCs = numCs_mat, coverage = coverage_mat, batch = batch, 
+group = group, full_mod = TRUE, ncores = 2)
 }
 
 }

@@ -21,7 +21,7 @@ counterparts, providing robust adjustment for technical variations (see Fig. 1 f
 the workflow).
 
 <div align="center">
-  <img src="images/Fig1.png" alt="Wf" width="800"/>
+  <img src="inst/images/Fig1.png" alt="Wf" width="800"/>
 </div>
 
 **Fig. 1.** Overview of the ComBat-met workflow.
@@ -49,7 +49,7 @@ The results demonstrated that ComBat-met consistently outperformed others in red
 batch-induced variability while preserving biological variability (Fig. 2).
 
 <div align="center">
-  <img src="images/Fig2.png" alt="benchmark" width="700"/>
+  <img src="inst/images/Fig2.png" alt="benchmark" width="700"/>
 </div>
 
 **Fig. 2.** Median true positive rates and false positive rates calculated based on 
@@ -63,7 +63,7 @@ Results showed that ComBat-met consistently achieved the smallest percentage of 
 variation in both normal and tumor samples (Fig. 3).
 
 <div align="center">
-  <img src="images/Fig3.png" alt="TCGA" width="800"/>
+  <img src="inst/images/Fig3.png" alt="TCGA" width="800"/>
 </div>
 <br>
 
@@ -84,7 +84,7 @@ consistently improved classification accuracy, emphasizing the importance of eff
 correction in methylation studies (Fig. 4).
 
 <div align="center">
-  <img src="images/Fig4.png" alt="ML" width="800"/>
+  <img src="inst/images/Fig4.png" alt="ML" width="800"/>
 </div>
 <br>
 

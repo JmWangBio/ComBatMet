@@ -52,9 +52,11 @@ batch <- c(rep(1, 4), rep(2, 4))
 group <- rep(c(0, 1), 4)
 
 # Adjust for batch effects including biological conditions
-adj_bv_mat <- Mvalue_ComBat(bv_mat, dtype = "b-value", batch = batch, group = group, full_mod = TRUE)
+adj_bv_mat <- Mvalue_ComBat(bv_mat, dtype = "b-value", batch = batch, 
+group = group, full_mod = TRUE)
 # Adjust for batch effects without including biological conditions
-adj_bv_mat <- Mvalue_ComBat(bv_mat, dtype = "b-value", batch = batch, group = group, full_mod = FALSE)
+adj_bv_mat <- Mvalue_ComBat(bv_mat, dtype = "b-value", batch = batch, 
+group = group, full_mod = FALSE)
 
 # Generate a random M-value matrix
 mv_mat <- matrix(rnorm(n = 400, mean = 0, sd = 1), nrow = 50, ncol = 8)
@@ -62,7 +64,10 @@ batch <- c(rep(1, 4), rep(2, 4))
 group <- rep(c(0, 1), 4)
 
 # Adjust for batch effects including biological conditions
-adj_mv_mat <- Mvalue_ComBat(mv_mat, dtype = "M-value", batch = batch, group = group, full_mod = TRUE)
+adj_mv_mat <- Mvalue_ComBat(mv_mat, dtype = "M-value", batch = batch, 
+group = group, full_mod = TRUE)
 # Adjust for batch effects without including biological conditions
-adj_mv_mat <- Mvalue_ComBat(mv_mat, dtype = "M-value", batch = batch, group = group, full_mod = FALSE)
+adj_mv_mat <- Mvalue_ComBat(mv_mat, dtype = "M-value", batch = batch, 
+group = group, full_mod = FALSE)
+
 }

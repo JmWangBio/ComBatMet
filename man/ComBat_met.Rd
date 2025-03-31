@@ -15,7 +15,8 @@ ComBat_met(
   mean.only = FALSE,
   feature.subset.n = NULL,
   pseudo_beta = 1e-04,
-  ref.batch = NULL
+  ref.batch = NULL,
+  ncores = 1
 )
 }
 \arguments{
@@ -41,6 +42,8 @@ ComBat_met(
 Value needs to be between 0 and 0.5. Only active when data type is beta-values.}
 
 \item{ref.batch}{NULL by default. If given, that batch will be selected as a reference for batch correction.}
+
+\item{ncores}{number of cores to be used for parallel computing. By default, ncores is set to one.}
 }
 \value{
 \code{ComBat_met} returns a feature x sample matrix with the same data type as input, adjusted for batch effects.
@@ -70,4 +73,9 @@ group <- rep(c(0, 1), 4)
 adj_mv_mat <- ComBat_met(mv_mat, dtype = "M-value", batch = batch, group = group, full_mod = TRUE)
 # Adjust for batch effects without including biological conditions
 adj_mv_mat <- ComBat_met(mv_mat, dtype = "M-value", batch = batch, group = group, full_mod = FALSE)
+
+# Adjust for batch effects including biological conditions (multiple threads)
+adj_mv_mat <- ComBat_met(mv_mat, dtype = "M-value", batch = batch, group = group, full_mod = TRUE, 
+ncores = 2)
+
 }

@@ -5,9 +5,13 @@ vec2mat <- function(vec, n_times) {
 }
 
 #### Monte Carlo integration functions for beta distribution
-monte_carlo_int_beta <- function(dat, mu, gamma, phi, delta, feature.subset.n) {
-  weights <- pos_res <- list()
-  for (i in 1:nrow(dat)) {
+monte_carlo_int_beta <- function(dat, mu, gamma, phi, delta, feature.subset.n, ncores) {
+  cl <- parallel::makeCluster(ncores)
+  
+  MC_int <- function(i) {
+    pos_res <- c(gamma.star = NA, 
+                 delta.star = NA)
+    
     m <- mu[-i, !is.na(dat[i, ])]
     p <- phi[-i, !is.na(dat[i, ])]
     x <- dat[i, !is.na(dat[i, ])]
@@ -16,9 +20,6 @@ monte_carlo_int_beta <- function(dat, mu, gamma, phi, delta, feature.subset.n) {
     
     # take a subset of features to do integration - save time
     if (!is.null(feature.subset.n) & is.numeric(feature.subset.n) & length(feature.subset.n) == 1) {
-      if (i == 1) {
-        cat(sprintf("Using %s random features for Monte Carlo integration\n", feature.subset.n))
-      }
       mcint_ind <- sample(1:(nrow(dat) - 1), feature.subset.n, replace = FALSE)
       m <- m[mcint_ind, ]
       p <- p[mcint_ind, ]
@@ -26,12 +27,6 @@ monte_carlo_int_beta <- function(dat, mu, gamma, phi, delta, feature.subset.n) {
       delta_sub <- delta_sub[mcint_ind]
       G_sub <- feature.subset.n
     } else {
-      if (i == 1) {
-        cat(
-          "Using all features for Monte Carlo integration; 
-        the function runs very slow for large number of features\n"
-        )
-      }
       G_sub <- nrow(dat) - 1
     }
     
@@ -41,30 +36,36 @@ monte_carlo_int_beta <- function(dat, mu, gamma, phi, delta, feature.subset.n) {
     })
     LH[is.na(LH)] <- 0
     if (sum(LH) == 0 | is.na(sum(LH))){
-      pos_res[[i]] <- c(gamma.star = as.numeric(gamma[i]),
-                        delta.star = as.numeric(delta[i]))
+      pos_res <- c(gamma.star = as.numeric(gamma[i]),
+                   delta.star = as.numeric(delta[i]))
     } else {
-      pos_res[[i]] <- c(gamma.star = NA, 
-                        delta.star = NA)
-      pos_res[[i]]["gamma.star"] <- sum(gamma_sub * LH, na.rm = TRUE) / 
+      pos_res["gamma.star"] <- sum(gamma_sub * LH, na.rm = TRUE) / 
         sum(LH[!is.na(gamma_sub)])
-      pos_res[[i]]["delta.star"] <- sum(delta_sub * LH, na.rm = TRUE) / 
+      pos_res["delta.star"] <- sum(delta_sub * LH, na.rm = TRUE) / 
         sum(LH[!is.na(delta_sub)])
     }
-    
-    weights[[i]] <- as.matrix(LH / sum(LH))
+    return(pos_res)
   }
-  pos_res <- do.call(rbind, pos_res)
-  res <- list(gamma_star = pos_res[, "gamma.star"], 
-              delta_star = pos_res[, "delta.star"]) 
+  
+  # run in parallel
+  pos_res_lst <- parallel::parLapply(cl, 1:nrow(dat), MC_int)
+  parallel::stopCluster(cl)
+  
+  pos_res_mat <- do.call(rbind, pos_res_lst)
+  res <- list(gamma_star = pos_res_mat[, "gamma.star"], 
+              delta_star = pos_res_mat[, "delta.star"]) 
   return(res)
 } 
 
 #### Monte Carlo integration functions for beta-binomial distributions
 monte_carlo_int_betabin <- function(numCs.dat, coverage.dat, mu, gamma, 
-                                    phi, delta, feature.subset.n) {
-  weights <- pos_res <- list()
-  for (i in 1:nrow(numCs.dat)) {
+                                    phi, delta, feature.subset.n, ncores) {
+  cl <- parallel::makeCluster(ncores)
+  
+  MC_int <- function(i) {
+    pos_res <- c(gamma.star = NA, 
+                 delta.star = NA)
+    
     m <- mu[-i, !is.na(numCs.dat[i, ]) & !is.na(coverage.dat[i, ])]
     p <- phi[-i, !is.na(numCs.dat[i, ]) & !is.na(coverage.dat[i, ])]
     x <- numCs.dat[i, !is.na(numCs.dat[i, ]) & !is.na(coverage.dat[i, ])]
@@ -74,23 +75,13 @@ monte_carlo_int_betabin <- function(numCs.dat, coverage.dat, mu, gamma,
     
     # take a subset of features to do integration - save time
     if (!is.null(feature.subset.n) & is.numeric(feature.subset.n) & length(feature.subset.n) == 1) {
-      if (i == 1) {
-        cat(sprintf("Using %s random features for Monte Carlo integration\n", feature.subset.n))
-      }
       mcint_ind <- sample(1:(nrow(numCs.dat) - 1), feature.subset.n, replace = FALSE)
       m <- m[mcint_ind, ]
       p <- p[mcint_ind, ]
-      y <- y[mcint_ind, ]
       gamma_sub <- gamma_sub[mcint_ind]
       delta_sub <- delta_sub[mcint_ind]
       G_sub <- feature.subset.n
     } else {
-      if (i == 1) {
-        cat(
-          "Using all features for Monte Carlo integration; 
-           the function runs very slow for large number of features\n"
-        )
-      }
       G_sub <- nrow(numCs.dat)-1
     }
     
@@ -103,23 +94,24 @@ monte_carlo_int_betabin <- function(numCs.dat, coverage.dat, mu, gamma,
     })
     LH[is.na(LH)] <- 0
     if (sum(LH) == 0 | is.na(sum(LH))){
-      pos_res[[i]] <- c(gamma.star = as.numeric(gamma[i]),
-                        delta.star = as.numeric(delta[i]))
+      pos_res <- c(gamma.star = as.numeric(gamma[i]),
+                   delta.star = as.numeric(delta[i]))
     } else {
-      pos_res[[i]] <- c(gamma.star = NA, 
-                        delta.star = NA)
-      pos_res[[i]]["gamma.star"] <- sum(gamma_sub * LH, na.rm = TRUE) / 
+      pos_res["gamma.star"] <- sum(gamma_sub * LH, na.rm = TRUE) / 
         sum(LH[!is.na(gamma_sub)])
-      pos_res[[i]]["delta.star"] <- sum(delta_sub * LH, na.rm = TRUE) / 
+      pos_res["delta.star"] <- sum(delta_sub * LH, na.rm = TRUE) / 
         sum(LH[!is.na(delta_sub)])
     }
-    
-    weights[[i]] <- as.matrix(LH / sum(LH))
+    return(pos_res)
   }
   
-  pos_res <- do.call(rbind, pos_res)
-  res <- list(gamma_star = pos_res[, "gamma.star"], 
-              delta_star = pos_res[, "delta.star"])	
+  # run in parallel
+  pos_res_lst <- parallel::parLapply(cl, 1:nrow(numCs.dat), MC_int)
+  parallel::stopCluster(cl)
+  
+  pos_res_mat <- do.call(rbind, pos_res_lst)
+  res <- list(gamma_star = pos_res_mat[, "gamma.star"], 
+              delta_star = pos_res_mat[, "delta.star"])	
   return(res)
 } 
 

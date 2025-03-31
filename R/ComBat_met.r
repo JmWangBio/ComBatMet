@@ -16,6 +16,7 @@
 #' @param pseudo_beta pseudo beta-values to be used for replacing extreme 0 and 1 beta-values. 
 #' Value needs to be between 0 and 0.5. Only active when data type is beta-values.
 #' @param ref.batch NULL by default. If given, that batch will be selected as a reference for batch correction.
+#' @param ncores number of cores to be used for parallel computing. By default, ncores is set to one.
 #' 
 #' @return \code{ComBat_met} returns a feature x sample matrix with the same data type as input, adjusted for batch effects.
 #' @export
@@ -40,11 +41,16 @@
 #' adj_mv_mat <- ComBat_met(mv_mat, dtype = "M-value", batch = batch, group = group, full_mod = TRUE)
 #' # Adjust for batch effects without including biological conditions
 #' adj_mv_mat <- ComBat_met(mv_mat, dtype = "M-value", batch = batch, group = group, full_mod = FALSE)
+#' 
+#' # Adjust for batch effects including biological conditions (multiple threads)
+#' adj_mv_mat <- ComBat_met(mv_mat, dtype = "M-value", batch = batch, group = group, full_mod = TRUE, 
+#' ncores = 2)
+#' 
 
 ComBat_met <- function(vmat, dtype = "b-value", 
                        batch, group = NULL, covar_mod = NULL, full_mod = TRUE,
                        shrink = FALSE, mean.only = FALSE, feature.subset.n = NULL,
-                       pseudo_beta = 1e-4, ref.batch = NULL) {
+                       pseudo_beta = 1e-4, ref.batch = NULL, ncores = 1) {
   ########  Preparation  ########
   ## convert extreme 0 or 1 values to pseudo-beta
   if (dtype == "b-value") {
@@ -201,32 +207,33 @@ ComBat_met <- function(vmat, dtype = "b-value",
   
   ########  Estimate parameters from beta GLM  ########
   cat("Fitting the GLM model\n")
-  gamma_hat_lst <- vector("list", length = nrow(bv))
-  mu_hat_lst <- vector("list", length = nrow(bv))
-  phi_hat_lst <- vector("list", length = nrow(bv))
-  delta_hat_lst <- vector("list", length = nrow(bv))
-  n_zero_modvar <- 0
-  n_zero_modvar_batch <- 0
-  n_moderr <- 0
   
-  for (k in 1:nrow(bv)) {
-    if (k %% 1000 == 0) {
-      cat(sprintf("%s features processed\n", k))
-    }
+  if (!is.numeric(ncores) || ncores != as.integer(ncores) || ncores <= 0) {
+    stop("ncores must be a positive integer.")
+  }
+  num_cores <- max(1, parallel::detectCores() - 1)
+  num_cores <- min(ncores, num_cores)
+  cl <- parallel::makeCluster(num_cores)
+  
+  # define the function to be applied in parallel
+  param_estim <- function(k) {
+    result<- list(gamma_hat = NULL, mu_hat = NULL, phi_hat = NULL, delta_hat = NULL,
+                  zero_modvar = 0, zero_modvar_batch = 0, moderr = 0)
+    
     # mark rows with NA values
     full_mat <- cbind(design, bv[k, ])
     nona <- which(stats::complete.cases(full_mat))
     
     # check if the data are all NAs
     if (length(nona) == 0) {
-      n_zero_modvar <- n_zero_modvar + 1
-      next
+      result$zero_modvar <- 1
+      return(result)
     }
     
     # check if the model has zero model variance
     if (qr(full_mat[nona, ])$rank < ncol(full_mat)) {
-      n_zero_modvar <- n_zero_modvar + 1
-      next
+      result$zero_modvar <- 1
+      return(result)
     }
     
     # if dispersion correction enabled, check whether the model has zero model 
@@ -235,8 +242,8 @@ ComBat_met <- function(vmat, dtype = "b-value",
       for (i in 1:length(batches_ind)) {
         if (qr(full_mat[intersect(batches_ind[[i]], nona), c(i, (n_batch+1):ncol(full_mat))])$rank < 
             ncol(full_mat) - n_batch + 1) {
-          n_zero_modvar_batch <- n_zero_modvar_batch + 1
-          next
+          result$zero_modvar_batch <- 1
+          return(result)
         }
       }
     }
@@ -259,8 +266,8 @@ ComBat_met <- function(vmat, dtype = "b-value",
     
     # if error with model fitting
     if (inherits(glm_f, "error")) {
-      n_moderr <- n_moderr + 1
-      next
+      result$moderr <- 1
+      return(result)
     }
     
     # compute mean and precision intercepts as batch-size-weighted average from batches
@@ -294,11 +301,24 @@ ComBat_met <- function(vmat, dtype = "b-value",
     }
     
     # store result
-    gamma_hat_lst[[k]] <- gamma_hat
-    mu_hat_lst[[k]] <- mu_hat
-    phi_hat_lst[[k]] <- phi_hat
-    delta_hat_lst[[k]] <- delta_hat
+    result$gamma_hat <- gamma_hat
+    result$mu_hat <- mu_hat
+    result$phi_hat <- phi_hat
+    result$delta_hat <- delta_hat
+    return(result)
   }
+  
+  # run in parallel
+  result_lst <- parallel::parLapply(cl, 1:nrow(bv), param_estim)
+  parallel::stopCluster(cl)
+  
+  gamma_hat_lst <- lapply(result_lst, function(x) x$gamma_hat)
+  mu_hat_lst <- lapply(result_lst, function(x) x$mu_hat)
+  phi_hat_lst <- lapply(result_lst, function(x) x$phi_hat)
+  delta_hat_lst <- lapply(result_lst, function(x) x$delta_hat)
+  n_zero_modvar <- sum(unlist(lapply(result_lst, function(x) x$zero_modvar)))
+  n_zero_modvar_batch <- sum(unlist(lapply(result_lst, function(x) x$zero_modvar_batch)))
+  n_moderr <- sum(unlist(lapply(result_lst, function(x) x$moderr)))
   
   cat(sprintf("Found %s features with zero model variance; 
               these features won't be adjusted for batch effects.\n",
@@ -335,14 +355,16 @@ ComBat_met <- function(vmat, dtype = "b-value",
                            gamma = gamma_hat_mat[, ii], 
                            phi = phi_hat_mat[, batches_ind[[ii]]],
                            delta = delta_hat_mat[, ii],
-                           feature.subset.n = feature.subset.n)
+                           feature.subset.n = feature.subset.n,
+                           ncores = num_cores)
       } else {
         invisible(utils::capture.output(mcres <- mcint_fun(dat = bv[, batches_ind[[ii]]], 
                                                            mu = mu_hat_mat[, batches_ind[[ii]]], 
                                                            gamma = gamma_hat_mat[, ii], 
                                                            phi = phi_hat_mat[, batches_ind[[ii]]], 
                                                            delta = delta_hat_mat[, ii],
-                                                           feature.subset.n = feature.subset.n)))
+                                                           feature.subset.n = feature.subset.n,
+                                                           ncores = num_cores)))
       }
       return(mcres)
     })

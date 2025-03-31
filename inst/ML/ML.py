@@ -67,7 +67,7 @@ num_random_features = 3
 num_iterations = 50
 
 # Set the random seed
-random.seed(100)
+random.seed(0)
 
 # Function to build a simple neural network
 def build_model(input_dim):

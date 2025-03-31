@@ -104,6 +104,24 @@ for (j in 1:Nsims) {
                                         batch = batch,
                                         group = treatment)
       
+      # ComBat-met with shrink
+      cat("Running Combat-met with shrink...\n")
+      beta.dat.cbm.shrink <- ComBat_met(beta.dat,
+                                        batch = batch,
+                                        group = treatment,
+                                        full_mod = TRUE,
+                                        pseudo_beta = 1e-4,
+                                        shrink = TRUE)
+      
+      # ComBat-biseq with shrink
+      cat("Running Combat-biseq with shrink...\n")
+      numCs.dat.cbbs.shrink <- ComBat_biseq(coverage = coverage.dat, 
+                                            numCs = numCs.dat, 
+                                            batch = batch, 
+                                            group = treatment, 
+                                            full_mod = TRUE,
+                                            shrink = TRUE)      
+      
       ###########################################
       #### differential methylation analysis ####
       ###########################################
@@ -184,6 +202,36 @@ for (j in 1:Nsims) {
         t_approx = TRUE,
         n_cores = 1)
       
+      ## ComBat-met with shrink + t-test
+      cat("Running t-test on results from ComBat-met with shrink...\n")
+      cbm.shrink.de.res <- diff_met_wf(beta.dat.cbm.shrink,
+                                       group = treatment,
+                                       contrast.pair = "group1-group0",
+                                       pseudo_beta = 1e-4,
+                                       eb = FALSE)
+      
+      ## ComBat-biseq with shrink + likelihood ratio test
+      cat("Running MethylSig on results from ComBat-biseq with shrink...\n")
+      shrink.adj.BS.dat.lst <- lapply(1:ncol(numCs.dat.cbbs.shrink), function(i) {
+        data.frame(chr = methylKit::getData(my.methyldata[[1]])$chr,
+                   pos = methylKit::getData(my.methyldata[[1]])$start,
+                   N = coverage.dat[, i],
+                   X = numCs.dat.cbbs.shrink[, i])
+      })
+      
+      shrink.adj.BSseq <- makeBSseqData(shrink.adj.BS.dat.lst, 1:length(shrink.adj.BS.dat.lst))
+      pData(shrink.adj.BSseq) <- data.frame(Type = treatment,
+                                            Batch = batch)
+      
+      shrink_diff_gr <- diff_methylsig(
+        bs = shrink.adj.BSseq,
+        group_column = 'Type',
+        comparison_groups = c('case' = '1', 'control' = '0'),
+        disp_groups = c('case' = TRUE, 'control' = TRUE),
+        local_window_size = 0,
+        t_approx = TRUE,
+        n_cores = 1)      
+      
       ## adjust p-values; label ground truth (positive or negative)
       tmp.pval.df <- rbind(raw.de.res[, c("id", "pval", "adj.pval")] %>% 
                              mutate(method = "raw + t-test"),
@@ -201,7 +249,12 @@ for (j in 1:Nsims) {
                            beclear.de.res[, c("id", "pval", "adj.pval")] %>%
                              mutate(method = "BEclear + t-test"),
                            ruvm.de.res[, c("id", "pval", "adj.pval")] %>%
-                             mutate(method = "RUVm + t-test")) %>%
+                             mutate(method = "RUVm + t-test"),
+                           cbm.shrink.de.res[, c("id", "pval", "adj.pval")] %>%
+                             mutate(method = "ComBat-Met (shrink) + t-test"),
+                           data.frame(id = 1:nrow(beta.dat), pval = shrink_diff_gr$pvalue) %>% 
+                             mutate(adj.pval = p.adjust(pval, method = "BH"),
+                                    method = "ComBat-biseq (shrink) + lrt")) %>%
         inner_join(data.frame(id = 1:nrow(beta.dat),
                               TP = ifelse(1:nrow(beta.dat) %in% my.methyldata[[2]], 
                                           TRUE, FALSE)),
