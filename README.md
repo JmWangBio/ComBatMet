@@ -1,7 +1,7 @@
 ComBatMet
 ================
 Junmin Wang
-01/09/2025
+03/31/2025
 
 This page aims to present ComBat-met in an accessible way for a broad 
 audience. For those interested in implementing ComBat-met or reproducing 
@@ -73,8 +73,8 @@ To demonstrate the importance of batch adjustment, we also evaluated the perform
 **neural network** classifier both **before** and **after** applying ComBat-met. For this 
 analysis:
 
-- We selected three random methylation features in each iteration to simulate a minimal 
-and unbiased feature set, avoiding cherry-picking variables that might artificially boost 
+- We selected three random methylation probes in each iteration to simulate a minimal 
+and unbiased probe set, avoiding cherry-picking variables that might artificially boost 
 performance.
 - A feed-forward, fully connected neural network with two hidden layers was trained to 
 classify normal and cancerous samples.
@@ -88,7 +88,7 @@ correction in methylation studies (Fig. 4).
 </div>
 <br>
 
-**Fig. 4.** Architecture of the neural network used for classification; jitter plot comparing 
+**Fig. 4.** Architecture of the neural network used for classification; box plot comparing 
 classification accuracy before and after batch adjustment using ComBat-met.
 
 ## Installation and Usage
@@ -148,26 +148,22 @@ from the TCGA data as shown in the manuscript are stored in the “inst” folde
       <td rowspan="2">
         <div>simulation/</div>
       </td>
-      <td>dataSim_all_DE_pipeline.R<br>dataSim_biseq_lrt_pipeline.R</td>
-      <td>simulation of methylation or bisulfite sequencing data followed by differential methylation analysis</td>
+      <td>dataSim_all_DE_pipeline.R<br>dataSim_biseq_lrt_pipeline.R<br>dataSim_all_DE_pipeline_minfi.R</td>
+      <td>simulation of methylation or bisulfite sequencing data followed by differential methylation analysis (limma or minfi)</td>
     </tr>
     <tr>
-      <td>analyze_all_DE_data.R<br>analyze_biseq_lrt_data.R</td>
+      <td>analyze_all_DE_data.R<br>analyze_biseq_lrt_data.R<br>analyze_all_DE_data_minfi.R</td>
       <td>calculating the true and false positive rates of each workflow</td>
     </tr>
     <tr>
-      <td rowspan="9">
+      <td rowspan="8">
         <div>Benchmarking with TCGA data</div>
       </td>
-      <td rowspan="6">
+      <td rowspan="5">
         <div>TCGA/</div>
       </td>
       <td>download_TCGA_data.R</td>
       <td>downloading the breast cancer subtype data</td>
-    </tr>
-    <tr>
-      <td>gene_all_NT_pipeline.R<br>gene_LumB_TP_pipeline.R</td>
-      <td>adjusting the gene-level data for batch effects in normal and tumor samples</td>
     </tr>
     <tr>
       <td>site_all_NT_pipeline.R<br>site_LumB_TP_pipeline.R</td>
@@ -178,12 +174,12 @@ from the TCGA data as shown in the manuscript are stored in the “inst” folde
       <td>making box plots of beta-values</td>
     </tr>
     <tr>
-      <td>plot_gene_pca.R<br>plot_site_pca.R</td>
-      <td>making PCA plots for the gene-level and site-level data</td>
+      <td>plot_site_pca.R</td>
+      <td>making PCA plots for the site-level data</td>
     </tr>
     <tr>
-      <td>plot_gene_perc_explained_variation.R<br>plot_site_perc_explained_variation.R</td>
-      <td>making violin plots for % variation explained by batch in the gene-level and site-level data</td>
+      <td>plot_site_perc_explained_variation.R</td>
+      <td>making violin plots for % variation explained by batch in the site-level data</td>
     </tr>
     <tr>
       <td rowspan="3">
@@ -194,11 +190,11 @@ from the TCGA data as shown in the manuscript are stored in the “inst” folde
     </tr>
     <tr>
       <td>ML.py</td>
-      <td>evaluating the impact of batch adjustment on classification by repeatedly selecting random features, training a neural network, and comparing accuracies before and after batch correction</td>
+      <td>evaluating the impact of batch adjustment on classification by repeatedly selecting random probes, training a neural network, and comparing accuracies before and after batch correction</td>
     </tr>
     <tr>
-      <td>visualization.py</td>
-      <td>making a jitter plot to visualize accuracies before and after batch adjustment</td>
+      <td>visualization.R</td>
+      <td>making a box plot to visualize differences in accuracy before and after batch adjustment</td>
     </tr>
   </tbody>
 </table>
