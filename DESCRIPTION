@@ -1,9 +1,8 @@
 Package: ComBatMet
 Title: Batch Correction for DNA Methylation Data
-Version: 0.0.0.9000
+Version: 0.99.0
 Authors@R: 
-    person("Junmin", "Wang", , "jmwang.bio@gmail.com", role = c("aut", "cre"),
-           comment = c(ORCID = "YOUR-ORCID-ID"))
+    person("Junmin", "Wang", , "jmwang.bio@gmail.com", role = c("aut", "cre"))
 Description: ComBatMet is a regression framework to adjust batch effects in DNA methylation studies. 
     This package includes three batch correction methods. ComBat-met fits beta regression models to the 
     beta-values, calculates batch-free distributions, and maps the quantiles of the estimated distributions 
@@ -23,4 +22,8 @@ Imports:
     sva,
     parallel
 Suggests:
-    methylKit
+    methylKit, BiocStyle, knitr, rmarkdown
+biocViews: DNAMethylation, Epigenetics, MethylationArray, MethylSeq, BatchEffect, Normalization, Software, StatisticalMethod
+VignetteBuilder: knitr
+URL: https://github.com/JmWangBio/ComBatMet
+BugReports: https://github.com/JmWangBio/ComBatMet/issues

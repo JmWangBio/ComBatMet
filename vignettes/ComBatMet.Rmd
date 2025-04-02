@@ -1,0 +1,103 @@
+---
+title: "A Tutorial for ComBat-met"
+author: "Junmin Wang"
+date: "2025-03-31"
+output: BiocStyle::html_document
+bibliography: '`r system.file("REFERENCES.bib", package="ComBatMet")`'
+vignette: >
+  %\VignetteIndexEntry{A Tutorial for ComBat-met}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+## Abstract
+The ComBat-met R package provides functions to adjust batch effects for DNA methylation data, supporting common data formats such as simple matrices. If you find ComBat-met useful, please cite @ComBatMet. 
+
+## Package Content
+The `ComBat-met` package includes:
+
+* ComBat-met: a beta regression framework to adjust batch effects for methylation beta-values and M-values.
+* ComBat-biseq: a beta-binomial regression framework to correct batch effects in bisulfite sequencing data.
+* Supplementary scripts: includes scripts for generating/analyzing simulated data and TCGA data (available in the "inst" folder). 
+
+## Introduction
+Integration of genomics data is routinely hindered by unwanted technical variations known as batch effects. Despite wide availability, existing batch correction methods often fall short in capturing the unique characteristics of DNA methylation data.
+
+ComBat-met addresses this challenge with a beta regression framework designed specificically for DNA methylation studies. Our method fits beta regression models to the data, calculates batch-free distributions, and maps the quantiles of the estimated distributions to their batch-free counterparts.
+
+## Using ComBat-met
+
+Below I will provide a few examples to demonstrate its usage. First, let’s simulate some DNA methylation data. Suppose that in a hypothetical methylation study of cancer, 50 probes/sites are quantified. The diseased group (i.e., D) and healthy group (i.e., H) has four replicates each. Two replicates belong to batch 1, and the other two replicates, batch 2.
+
+```{r, eval = TRUE}
+# Load library
+library(ComBatMet)
+
+# Generate a random beta-value matrix
+set.seed(1)
+bv_mat <- matrix(runif(n = 400, min = 0, max = 1), nrow = 50, ncol = 8)
+batch <- c(rep(1, 4), rep(2, 4))
+group <- rep(c(0, 1), 4)
+
+# Convert beta-values to M-values
+mv_mat <- log(bv_mat / (1 - bv_mat))
+```
+
+Now let's adjust for batch effects. The `ComBat_met` function takes a beta-value or M-value matrix, a batch vector, and an optional group (i.e., condition) vector as input.
+
+```{r, eval = TRUE}
+# Adjust beta-values for batch effects
+adj_bv_mat <- ComBat_met(bv_mat, batch = batch, group = group, full_mod = TRUE)
+
+# Adjust M-values for batch effects
+adj_bv_mat <- ComBat_met(mv_mat, dtype = "M-value", batch = batch, group = group, full_mod = TRUE)
+```
+
+The output of the `ComBat_met` function is a batch-adjusted beta-value or M-value matrix, depending on the type of the input data, with the same dimensions (rows and columns) as the original input.
+
+In large-scale projects, batches may arrive sequentially, and not all batches may be available at the time of batch correction. In such cases, it is particularly useful to adjust batch effects relative to a reference batch, ensuring consistency as new batches are processed. The `ComBat_met` function provides this capability through the `ref.batch` parameter:`
+
+```{r, eval = TRUE}
+# Adjust batch effects to batch #1 (reference batch)
+adj_bv_mat <- ComBat_met(bv_mat, batch = batch, group = group, full_mod = TRUE, ref.batch = 1)
+```
+
+Batch correction with and without a reference batch are not mutually exclusive. You can first apply `ComBat_met` to an initial dataset without specifying a reference batch. Later, when a new dataset becomes available, you can apply `ComBat_met` again - this time including both the new dataset and a single previously corrected batch, using that batch as the reference batch. There is no need to include all previously corrected batches.
+
+```{r, eval = TRUE}
+# Generate a random beta-value matrix for batch #3 (new batch)
+bv_mat_new <- matrix(runif(n = 200, min = 0, max = 1), nrow = 50, ncol = 4)
+
+# Combine corrected batch #1 data with batch #3 data 
+bv_mat_full <- cbind(adj_bv_mat[, 1:4], bv_mat_new)
+
+# Adjust batch #3 to batch #1 (reference batch)
+batch <- c(rep(1, 4), rep(3, 4))
+group <- rep(c(0, 1), 4)
+adj_bv_mat <- ComBat_met(bv_mat_full, batch = batch, group = group, full_mod = TRUE, ref.batch = 1)
+```
+
+One advantage of this approach is that, in the first step (without a reference batch), the precision of the data is adjusted/estimated to the average precision across all batches. In the second step - and in all future steps - the precision of new data is adjusted to match this established estimate, ensuring consistency across batches over time.
+
+`ComBat-met` also includes an empirical Bayes parameter shrinkage option. While this approach is not recommended in most cases, it is available for users who wish to explore it. If you choose to use this option, you can run the following command:
+
+```{r, eval = TRUE}
+# Include parameter shrinkage
+adj_bv_mat <- ComBat_met(bv_mat, batch = batch, group = group, full_mod = TRUE, shrink = TRUE)
+```
+
+Real-world DNA methylation datasets tend to be high-dimensional, making computational efficiency a key consideration. To address this, ComBat-met provides an option to parallelize the batch correction process via the `ncores` parameter:
+
+```{r, eval = TRUE}
+# Use two threads for batch correction
+adj_bv_mat <- ComBat_met(bv_mat, batch = batch, group = group, full_mod = TRUE, ncores = 2)
+```
+
+## References
