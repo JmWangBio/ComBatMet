@@ -121,10 +121,11 @@ Now let's adjust for batch effects.
 ``` r
 # Adjust for batch effects including biological conditions
 adj_bv_mat <- ComBat_met(bv_mat, batch = batch, group = group, full_mod = TRUE)
-
-# Adjust for batch effects without including biological conditions
-adj_bv_mat <- ComBat_met(bv_mat, batch = batch, group = group, full_mod = FALSE)
 ```
+
+The example above provides a simple introduction to get you started. For more detailed examples, 
+including reference-batch correction, parallelization, and other advanced features, please refer 
+to the vignette.
 
 ## Code Descriptions
 
