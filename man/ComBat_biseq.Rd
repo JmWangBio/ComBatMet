@@ -32,7 +32,7 @@ ComBat_biseq(
 
 \item{shrink}{Boolean variable indicating whether to apply EB-shrinkage on parameter estimation}
 
-\item{mean.only}{Boolean variable indicating whether to apply EB-shrinkage on the estimation of dispersion effects}
+\item{mean.only}{Boolean variable indicating whether to apply EB-shrinkage on the estimation of precision effects}
 
 \item{feature.subset.n}{number of features to use in non-parametric EB estimation, only useful when shrink equals TRUE}
 

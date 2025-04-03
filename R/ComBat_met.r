@@ -11,10 +11,10 @@
 #' @param covar_mod optional model matrix representing co-variates to be included in the model
 #' @param full_mod Boolean variable indicating whether to include biological condition of interest in the model
 #' @param shrink Boolean variable indicating whether to apply EB-shrinkage on parameter estimation
-#' @param mean.only Boolean variable indicating whether to apply EB-shrinkage on the estimation of dispersion effects
+#' @param mean.only Boolean variable indicating whether to apply EB-shrinkage on the estimation of precision effects
 #' @param feature.subset.n number of features to use in non-parametric EB estimation, only useful when shrink equals TRUE
 #' @param pseudo_beta pseudo beta-values to be used for replacing extreme 0 and 1 beta-values. 
-#' Value needs to be between 0 and 0.5. Only active when data type is beta-values.
+#' Value needs to be between 0 and 0.5. Only active when dtype equals b-value.
 #' @param ref.batch NULL by default. If given, that batch will be selected as a reference for batch correction.
 #' @param ncores number of cores to be used for parallel computing. By default, ncores is set to one.
 #' 
@@ -236,7 +236,7 @@ ComBat_met <- function(vmat, dtype = "b-value",
       return(result)
     }
     
-    # if dispersion correction enabled, check whether the model has zero model 
+    # if precision correction enabled, check whether the model has zero model 
     # variance within any batch
     if (!mean.only.vec[k]) {
       for (i in 1:length(batches_ind)) {

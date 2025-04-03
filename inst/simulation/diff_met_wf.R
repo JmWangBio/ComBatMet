@@ -36,19 +36,19 @@ diff_met_wf <- function(bv, group, contrast.pair,
   }
   
   ## fit linear model
-  fit <- lmFit(mv, design)
+  fit <- limma::lmFit(mv, design)
   
   ## create contrasts
-  contrasts <- makeContrasts(contrasts = contrast.pair,
-                             levels = design)
+  contrasts <- limma::makeContrasts(contrasts = contrast.pair,
+                                    levels = design)
   
   ## empirical Bayes shrinkage
-  contrasts.fit <- eBayes(contrasts.fit(fit, contrasts))
+  contrasts.fit <- limma::eBayes(limma::contrasts.fit(fit, contrasts))
   
   ## calculate moderated or ordinary t-statistics, p-values, and adj. p-values
   if (eb) {
-    contrasts.fit.res <- topTable(contrasts.fit, coef = 1, 
-                                  number = Inf, sort.by = "none")
+    contrasts.fit.res <- limma::topTable(contrasts.fit, coef = 1,
+                                         number = Inf, sort.by = "none")
     t_stat <- contrasts.fit.res$t
     pval <- contrasts.fit.res$P.Value
     adj.pval <- contrasts.fit.res$adj.P.Val

@@ -30,7 +30,7 @@ The `ComBat-met` package includes:
 ## Introduction
 Integration of genomics data is routinely hindered by unwanted technical variations known as batch effects. Despite wide availability, existing batch correction methods often fall short in capturing the unique characteristics of DNA methylation data.
 
-ComBat-met addresses this challenge with a beta regression framework designed specificically for DNA methylation studies. Our method fits beta regression models to the data, calculates batch-free distributions, and maps the quantiles of the estimated distributions to their batch-free counterparts.
+ComBat-met addresses this challenge with a beta regression framework designed specifically for DNA methylation studies. Our method fits beta regression models to the data, calculates batch-free distributions, and maps the quantiles of the estimated distributions to their batch-free counterparts.
 
 ## Using ComBat-met
 

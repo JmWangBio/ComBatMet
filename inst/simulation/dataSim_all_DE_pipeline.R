@@ -3,7 +3,7 @@
 ## Date: January 8th, 2025
 ## IMPORTANT NOTE: To run this script successfully, you need to have the dplyr, methylKit, methylSig, DSS, emdbook, limma, sva, BEclear, and missMethyl R packages installed.
 ## Make sure to change the path of the output to where you want to save it.
-## Also, please make sure to provide the correct paths to "dataSim_custom.R", "diff_met_wf.R", "apply_BEclear.R", and "apply_RUVm_DE.R"
+## Also, please make sure to provide the correct paths to "dataSim_custom.R", "diff_met_wf.R", "apply_BEclear.R", and "apply_RUVm_DE.R" (all four scripts inside the "inst" folder).
 ## This script can be used to simulate bisulfite sequencing data with varying mean and dispersion (precision) batch effects.
 ## The simulated data are adjusted for batch effects using different methods followed by diff. met. analysis.
 ## Beware that running 1000 simulations requires lots of computing power, so using a high performance computing environment is strongly recommended.
@@ -43,7 +43,7 @@ pval.df.all <- data.frame()
 for (j in 1:Nsims) {
   pval.df <- data.frame()
   
-  ## loop through possible values of dispersion batch effects
+  ## loop through possible values of dispersion (precision) batch effects
   for (disp_batch_effect in disp_batch_effect_lst) {
     ## loop through possible values of mean batch effects
     for (batch_effect in batch_effect_lst) {

@@ -1,22 +1,20 @@
 
 ## Author: Junmin Wang
 ## Date: January 8th, 2025
-## IMPORTANT NOTE: To run this script successfully, you need to have the dplyr, methylKit, DSS, minfi, BEclear, and missMethyl R packages installed.
+## IMPORTANT NOTE: To run this script successfully, you need to have the dplyr, methylKit, minfi, and BEclear R packages installed.
 ## Make sure to change the path of the output to where you want to save it.
-## Also, please make sure to provide the correct paths to "dataSim_custom.R", "diff_met_wf_minfi.R", and "apply_BEclear.R"
+## Also, please make sure to provide the correct paths to "dataSim_custom.R", "diff_met_wf_minfi.R", and "apply_BEclear.R" (all three scripts inside the "inst" folder).
 ## This script can be used to simulate bisulfite sequencing data with varying mean and dispersion (precision) batch effects.
-## The simulated data are adjusted for batch effects using different methods followed by diff. met. analysis.
+## The simulated data are adjusted for batch effects using different methods (shrinkage vs non-shrinkage) followed by diff. met. analysis.
 ## Beware that running 1000 simulations requires lots of computing power, so using a high performance computing environment is strongly recommended.
 ## To run fewer simulations, change "Nsims" from 1000 to 1.
 
 ## load libraries
 library(dplyr)
 library(methylKit)
-library(DSS)
 library(minfi)
 library(ComBatMet)
 library(BEclear)
-library(missMethyl)
 
 ## load simulation functions
 source("path/to/inst/simulation/dataSim_custom.R")
@@ -41,7 +39,7 @@ pval.df.all <- data.frame()
 for (j in 1:Nsims) {
   pval.df <- data.frame()
   
-  ## loop through possible values of dispersion batch effects
+  ## loop through possible values of dispersion (precision) batch effects
   for (disp_batch_effect in disp_batch_effect_lst) {
     ## loop through possible values of mean batch effects
     for (batch_effect in batch_effect_lst) {

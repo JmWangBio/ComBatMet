@@ -34,12 +34,12 @@ ComBat_met(
 
 \item{shrink}{Boolean variable indicating whether to apply EB-shrinkage on parameter estimation}
 
-\item{mean.only}{Boolean variable indicating whether to apply EB-shrinkage on the estimation of dispersion effects}
+\item{mean.only}{Boolean variable indicating whether to apply EB-shrinkage on the estimation of precision effects}
 
 \item{feature.subset.n}{number of features to use in non-parametric EB estimation, only useful when shrink equals TRUE}
 
 \item{pseudo_beta}{pseudo beta-values to be used for replacing extreme 0 and 1 beta-values.
-Value needs to be between 0 and 0.5. Only active when data type is beta-values.}
+Value needs to be between 0 and 0.5. Only active when dtype equals b-value.}
 
 \item{ref.batch}{NULL by default. If given, that batch will be selected as a reference for batch correction.}
 

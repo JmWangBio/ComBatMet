@@ -7,7 +7,6 @@
 #' @inheritParams ComBat_met
 #' @param numCs matrix of number of methylated cytosines
 #' @param coverage matrix of coverage
-#' @param shrink Boolean variable indicating whether to apply EB-shrinkage on parameter estimation
 #' 
 #' @return \code{ComBat_biseq} returns a batch-adjusted feature x sample count matrix, representing number
 #' of methylated cytosines
