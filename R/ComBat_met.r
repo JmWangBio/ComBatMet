@@ -52,6 +52,15 @@ ComBat_met <- function(vmat, dtype = "b-value",
                        shrink = FALSE, mean.only = FALSE, feature.subset.n = NULL,
                        pseudo_beta = 1e-4, ref.batch = NULL, ncores = 1) {
   ########  Preparation  ########
+  ## check if vmat has the correct format
+  if (!(is.matrix(vmat) && is.numeric(vmat))) {
+    if (is.data.frame(vmat) && all(sapply(vmat, is.numeric))) {
+      vmat <- as.matrix(vmat)
+    } else {
+      stop("vmat must be a matrix of beta-values or M-values.")
+    }
+  }
+  
   ## convert extreme 0 or 1 values to pseudo-beta
   if (dtype == "b-value") {
     if (pseudo_beta <= 0 | pseudo_beta >= 0.5) {

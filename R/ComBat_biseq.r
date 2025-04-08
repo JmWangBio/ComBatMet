@@ -41,6 +41,24 @@ ComBat_biseq <- function(numCs, coverage, batch, group = NULL, covar_mod = NULL,
                          shrink = FALSE, mean.only = FALSE, feature.subset.n = NULL,
                          ncores = 1) {  
   ########  Preparation  ########
+  ## Check if numCs is a matrix of number of methylated cystosines
+  if (!(is.matrix(numCs) && is.numeric(numCs))) {
+    if (is.data.frame(numCs) && all(sapply(numCs, is.numeric))) {
+      numCs <- as.matrix(numCs)
+    } else {
+      stop("numCs must be a matrix of number of methylated cytosines.")
+    }
+  }
+  
+  ## Check if coverage is a matrix of numeric values
+  if (!(is.matrix(coverage) && is.numeric(coverage))) {
+    if (is.data.frame(coverage) && all(sapply(coverage, is.numeric))) {
+      coverage <- as.matrix(coverage)
+    } else {
+      stop("coverage must be a matrix of numeric values.")
+    }
+  }
+  
   ## Check if coverage and numCs are the same size
   if (!all(dim(coverage) == dim(numCs))) {
     stop("Coverage matrix and numCs matrix are not the same size.")
