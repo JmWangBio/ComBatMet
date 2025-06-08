@@ -25,12 +25,20 @@ The `ComBat-met` package includes:
 
 * ComBat-met: a beta regression framework to adjust batch effects for methylation beta-values and M-values.
 * ComBat-biseq: a beta-binomial regression framework to correct batch effects in bisulfite sequencing data.
-* Supplementary scripts: includes scripts for generating/analyzing simulated data and TCGA data (available in the "inst" folder). 
+* Supplementary scripts: includes scripts for generating/analyzing simulated data and TCGA data, as described in @ComBatMet (available in the "inst" folder). 
 
 ## Introduction
 Integration of genomics data is routinely hindered by unwanted technical variations known as batch effects. Despite wide availability, existing batch correction methods often fall short in capturing the unique characteristics of DNA methylation data.
 
 ComBat-met addresses this challenge with a beta regression framework designed specifically for DNA methylation studies. Our method fits beta regression models to the data, calculates batch-free distributions, and maps the quantiles of the estimated distributions to their batch-free counterparts.
+
+Using simulated and TCGA data, we demonstrated that ComBat-met followed by differential methylation analysis achieved superior performance compared to traditional methods. Key advantages of our approach include:
+
+- **Appropriate distributional assumptions**: ComBat assumes that data to be corrected follow a Gaussian distribution. Applying it directly to methylation percentages may risk producing corrected values outside the range of 0 and 1. In contrast, ComBat-met assumes a beta distribution.
+- **Higher statistical power**: Transforming methylation percentages to M-values prior to ComBat exhibits lower statistical power compared to ComBat-met, and a lesser ability to remove batch effects based on TCGA data.
+- **Stable performance**: SVA and RUVm showed unstable performance, with inflated false positive rates in some cases and reduced true positive rates in others. This variability was expected because SVA and RUVm are not optimized for scenarios where technical variations stem from identifiable sources. BEclear showed inflated false positive rates for scenarios involving large batch effects.
+
+For detailed comparisons, please see @ComBatMet.
 
 ## Using ComBat-met
 
@@ -98,6 +106,21 @@ Real-world DNA methylation datasets tend to be high-dimensional, making computat
 ```{r, eval = TRUE}
 # Use two threads for batch correction
 adj_bv_mat <- ComBat_met(bv_mat, batch = batch, group = group, full_mod = TRUE, ncores = 2)
+```
+
+Besides a numeric matrix, `ComBat_met` and `Mvalue_ComBat` can also take a SummarizedExperiment object as input. To see how it works, let's first store the data simulated above as a SummarizedExperiment object.
+
+```{r, eval = TRUE}
+library(SummarizedExperiment)
+colData <- data.frame(batch = batch, group = group)
+dat.nn <- bv_mat
+dat.se <- SummarizedExperiment(assays = list(val = dat.nn), colData = colData)
+```
+
+Afterwards, let's run `ComBat_met` as follows:
+
+```{r, eval = TRUE}
+adj_bv_mat <- ComBat_met(dat.se, dtype = "b-value", full_mod = TRUE)
 ```
 
 ## References

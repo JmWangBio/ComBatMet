@@ -35,12 +35,56 @@
 #' adj_mv_mat <- Mvalue_ComBat(mv_mat, dtype = "M-value", batch = batch, 
 #' group = group, full_mod = FALSE)
 #' 
+#' # Store data as a SummarizedExperiment object
+#' library(SummarizedExperiment)
+#' colData <- data.frame(batch = batch, group = group)
+#' dat.nn <- bv_mat
+#' dat.se <- SummarizedExperiment(assays = list(val = dat.nn), colData = colData)
+#' adj_bv_mat <- Mvalue_ComBat(dat.se, dtype = "b-value", full_mod = TRUE)
+#' 
 
 Mvalue_ComBat <- function(vmat, dtype = "b-value", 
                           batch, group = NULL, 
                           covar_mod = NULL, full_mod = TRUE, 
                           mean.only = FALSE, pseudo_beta = 1e-4,
                           ref.batch = NULL) {
+  ## check if vmat is a SummarizedExperiment object
+  if (inherits(vmat, "SummarizedExperiment")) {
+    ## Get the metadata (column data)
+    col_data <- SummarizedExperiment::colData(vmat)
+    
+    ## Check for the batch column
+    if ("batch" %in% colnames(col_data)) {
+      batch <- col_data[, "batch", drop = TRUE]
+    } else {
+      stop("Metadata must contain a batch column.")
+    }
+    
+    ## Check for the group column
+    if ("group" %in% colnames(col_data)) {
+      group <- col_data[, "group", drop = TRUE]
+    } else {
+      cat("Metadata does not have a group column.\n")
+      group <- NULL
+    }
+    
+    ## Check for covariates
+    all_cols <- colnames(col_data)
+    covar_cols <- setdiff(all_cols, c("batch", "group"))
+    if (length(covar_cols) > 0) {
+      covar_mod <- col_data[, covar_cols, drop = FALSE]
+    } else {
+      cat("Metadata does not have other covariate columns besides batch or group.\n")
+      covar_mod <- NULL
+    }    
+    
+    ## Extract assay data
+    if (length(SummarizedExperiment::assays(vmat)) == 0) {
+      stop("No assay data found in the SummarizedExperiment object.")
+    }
+    vmat <- SummarizedExperiment::assay(vmat)
+  }
+  
   ## convert extreme 0 or 1 values to pseudo-beta
   if (dtype == "b-value") {
     if (pseudo_beta <= 0 | pseudo_beta >= 0.5) {

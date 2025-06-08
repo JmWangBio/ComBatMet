@@ -7,6 +7,9 @@
 #' @inheritParams ComBat_met
 #' @param numCs matrix of number of methylated cytosines
 #' @param coverage matrix of coverage
+#' @param batch vector for batch
+#' @param group optional vector for biological condition of interest
+#' @param covar_mod optional model matrix representing co-variates to be included in the model
 #' 
 #' @return \code{ComBat_biseq} returns a batch-adjusted feature x sample count matrix, representing number
 #' of methylated cytosines

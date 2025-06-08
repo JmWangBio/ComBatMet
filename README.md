@@ -206,4 +206,4 @@ We welcome your feedback and contributions! If you have suggestions, find an iss
 
 ## References
 
-- Wang J. ComBat-met: Adjusting Batch Effects in DNA Methylation Data. *bioRxiv* 2024.08.13.607838.
+- Wang J. ComBat-met: Adjusting Batch Effects in DNA Methylation Data. *NAR Genom Bioinform*. 2025 May 19;7(2): lqaf062.

@@ -17,15 +17,15 @@ Mvalue_ComBat(
 )
 }
 \arguments{
-\item{vmat}{matrix of beta-values or M-values}
+\item{vmat}{matrix of beta-values or M-values, or a SummarizedExperiment object; if vmat is a SummarizedExperiment object, methylation data should be stored in its assay and metadata should be stored in its colData. For the metadata, the batch and group columns should be named "batch" and "group", respectively.}
 
 \item{dtype}{data type: b-value or M-value; note that the input and output have the same data type.}
 
-\item{batch}{vector for batch}
+\item{batch}{vector for batch; if vmat is a SummarizedExperiment object, its colData must contain a batch column.}
 
-\item{group}{optional vector for biological condition of interest}
+\item{group}{optional vector for biological condition of interest; if vmat is a SummarizedExperiment object, group is specified by the group column in its colData.}
 
-\item{covar_mod}{optional model matrix representing co-variates to be included in the model}
+\item{covar_mod}{optional model matrix representing co-variates to be included in the model; if vmat is a SummarizedExperiment object, any column besides batch or group in its colData will be treated as covariates.}
 
 \item{full_mod}{Boolean variable indicating whether to include biological condition of interest in the model}
 
@@ -69,5 +69,12 @@ group = group, full_mod = TRUE)
 # Adjust for batch effects without including biological conditions
 adj_mv_mat <- Mvalue_ComBat(mv_mat, dtype = "M-value", batch = batch, 
 group = group, full_mod = FALSE)
+
+# Store data as a SummarizedExperiment object
+library(SummarizedExperiment)
+colData <- data.frame(batch = batch, group = group)
+dat.nn <- bv_mat
+dat.se <- SummarizedExperiment(assays = list(val = dat.nn), colData = colData)
+adj_bv_mat <- Mvalue_ComBat(dat.se, dtype = "b-value", full_mod = TRUE)
 
 }
