@@ -111,7 +111,7 @@ two replicates, batch 2.
 library(ComBatMet)
 
 # Generate a random beta-value matrix
-bv_dat <- matrix(runif(n = 400, min = 0, max = 1), nrow = 50, ncol = 8)
+bv_mat <- matrix(runif(n = 400, min = 0, max = 1), nrow = 50, ncol = 8)
 batch <- c(rep(1, 4), rep(2, 4))
 group <- rep(c(0, 1), 4)
 ```
