@@ -3,7 +3,7 @@ ComBatMet
 Junmin Wang
 02/24/2026
 
-<font color="red">NEWS:</font> The functionality of ComBat-met is now also accessible through <font color="red">ComBatSuite</font>, a comprehensive collection of tools for batch correction developed by Dr. William Evan Johnson's lab at Rutgers University. Access it at: https://github.com/wejlab/ComBatSuite.
+**NEWS:** The functionality of ComBat-met is now also accessible through **ComBatSuite**, a comprehensive collection of tools for batch correction developed by Dr. William Evan Johnson's lab at Rutgers University. Access it at: https://github.com/wejlab/ComBatSuite.
 
 This page aims to present ComBat-met in an accessible way for a broad 
 audience. For those interested in implementing ComBat-met or reproducing 
