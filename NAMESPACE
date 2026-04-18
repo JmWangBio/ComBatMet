@@ -3,3 +3,5 @@
 export(ComBat_biseq)
 export(ComBat_met)
 export(Mvalue_ComBat)
+importFrom(Rcpp,sourceCpp)
+useDynLib(ComBatMet, .registration = TRUE)
