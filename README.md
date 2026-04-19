@@ -18,7 +18,8 @@ provided at the bottom of this page.
 
 ComBat-met was published in NAR Genomics and Bioinformatics. Whenever using ComBat-met, please cite:
 
-- Wang J. ComBat-met: Adjusting Batch Effects in DNA Methylation Data. *NAR Genom Bioinform*. 2025 May 19;7(2): lqaf062.
+> Wang J. ComBat-met: Adjusting Batch Effects in DNA Methylation Data. *NAR Genom Bioinform*. 2025 May 19;7(2): lqaf062.
+> DOI: [https://doi.org/10.1093/nargab/lqaf062](https://doi.org/10.1093/nargab/lqaf062)
 
 ## Introduction
 
