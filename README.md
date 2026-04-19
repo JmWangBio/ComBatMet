@@ -8,6 +8,18 @@ audience. For those interested in implementing ComBat-met or reproducing
 the results in the manuscript, detailed prerequisites and code descriptions are 
 provided at the bottom of this page.
 
+## Why Use ComBat-met?
+
+- **Built for methylation data.** Beta-values are bounded between 0 and 1 and have skewed properties that Gaussian-based methods cannot properly handle. ComBat-met uses a beta regression framework that respects the true distributional structure of methylation data.
+
+- **Outperforms existing methods.** ComBat-met consistently removes more batch-associated variation while preserving biological signals, achieving higher statistical power without inflating false positive rates.
+
+- **Fast.** A dataset with 900,000 methylation sites (e.g., Illumina EPIC v2 array) across 8 samples finishes in under 2 minutes.
+
+ComBat-met was published in NAR Genomics and Bioinformatics. Whenever using ComBat-met, please cite:
+
+- Wang J. ComBat-met: Adjusting Batch Effects in DNA Methylation Data. *NAR Genom Bioinform*. 2025 May 19;7(2): lqaf062.
+
 ## Introduction
 
 Integration of genomics data is frequently impeded by technical artifacts, commonly 
@@ -19,10 +31,6 @@ specifically tailored for methylation studies. This method employs a beta regres
 to estimate batch-free distributions, and realigns quantiles of the data to their corrected 
 counterparts, providing robust adjustment for technical variations (see Fig. 1 for details of 
 the workflow).
-
-ComBat-met was published in NAR Genomics and Bioinformatics. Whenever using ComBat-met, please cite:
-
-- Wang J. ComBat-met: Adjusting Batch Effects in DNA Methylation Data. *NAR Genom Bioinform*. 2025 May 19;7(2): lqaf062.
 
 <div align="center">
   <img src="inst/images/Fig1.png" alt="Wf" width="800"/>
@@ -206,7 +214,7 @@ from the TCGA data as shown in the manuscript are stored in the “inst” folde
 
 ## Key Updates
 
-The core parameter estimation engine has been rewritten in C++ with LAPACK/BLAS routines, eliminating the `betareg` dependency. Precision is now estimated within each batch using a fast grid-based search. A dataset of 900,000 methylation sites across 8 samples now completes in under 2 minutes. Parallelisation across batches is supported via the `ncores` argument. This improvement was inspired by the GLM regression framework in edgeR and ComBat-seq.
+April, 2026: The core parameter estimation engine has been rewritten in C++ with LAPACK/BLAS routines, eliminating the `betareg` dependency. Precision is now estimated within each batch using a fast grid-based search. A dataset of 900,000 methylation sites across 8 samples now completes in under 2 minutes. Parallelisation across batches is supported via the `ncores` argument. This improvement was inspired by the GLM regression framework in edgeR and ComBat-seq.
 
 ## Contribute
 
