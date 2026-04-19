@@ -1,9 +1,7 @@
 ComBatMet
 ================
 Junmin Wang
-02/24/2026
-
-**NEWS:** The functionality of ComBat-met is now also accessible through **ComBatSuite**, a comprehensive collection of tools for batch correction developed by Dr. William Evan Johnson's lab at Rutgers University. Access it at: https://github.com/wejlab/ComBatSuite.
+04/19/2026
 
 This page aims to present ComBat-met in an accessible way for a broad 
 audience. For those interested in implementing ComBat-met or reproducing 
@@ -16,11 +14,15 @@ Integration of genomics data is frequently impeded by technical artifacts, commo
 referred to as batch effects. While many batch correction methods are available, they 
 often fail to adequately account for the unique properties of DNA methylation data. 
 
-To  address this limitation, we developed **ComBat-met**, a novel batch adjustment framework 
+To address this limitation, we developed **ComBat-met**, a novel batch adjustment framework 
 specifically tailored for methylation studies. This method employs a beta regression model 
 to estimate batch-free distributions, and realigns quantiles of the data to their corrected 
 counterparts, providing robust adjustment for technical variations (see Fig. 1 for details of 
 the workflow).
+
+ComBat-met was published in NAR Genomics and Bioinformatics. Whenever using ComBat-met, please cite:
+
+- Wang J. ComBat-met: Adjusting Batch Effects in DNA Methylation Data. *NAR Genom Bioinform*. 2025 May 19;7(2): lqaf062.
 
 <div align="center">
   <img src="inst/images/Fig1.png" alt="Wf" width="800"/>
@@ -202,10 +204,10 @@ from the TCGA data as shown in the manuscript are stored in the “inst” folde
   </tbody>
 </table>
 
+## Key Updates
+
+The core parameter estimation engine has been rewritten in C++ with LAPACK/BLAS routines, eliminating the `betareg` dependency. Precision is now estimated within each batch using a fast grid-based search. A dataset of 900,000 methylation sites across 8 samples now completes in under 2 minutes. Parallelisation across batches is supported via the `ncores` argument. This improvement was inspired by the GLM regression framework in edgeR and ComBat-seq.
+
 ## Contribute
 
 We welcome your feedback and contributions! If you have suggestions, find an issue, or want to add new features, feel free to open an issue or submit a pull request. Together, we can make this project even better!
-
-## References
-
-- Wang J. ComBat-met: Adjusting Batch Effects in DNA Methylation Data. *NAR Genom Bioinform*. 2025 May 19;7(2): lqaf062.
