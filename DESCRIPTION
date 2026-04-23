@@ -31,3 +31,4 @@ URL: https://github.com/JmWangBio/ComBatMet
 BugReports: https://github.com/JmWangBio/ComBatMet/issues
 LinkingTo: 
     Rcpp
+NeedsCompilation: yes
