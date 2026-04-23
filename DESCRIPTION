@@ -22,7 +22,9 @@ Imports:
     sva,
     parallel,
     SummarizedExperiment,
-    Rcpp
+    Rcpp,
+    future,
+    future.apply
 Suggests:
     methylKit, BiocStyle, knitr, rmarkdown
 biocViews: DNAMethylation, Epigenetics, MethylationArray, MethylSeq, BatchEffect, Normalization, Software, StatisticalMethod

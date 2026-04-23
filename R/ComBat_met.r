@@ -341,11 +341,13 @@ ComBat_met <- function(vmat, dtype = "b-value",
     
     if (num_cores > 1L) {
       cat("Estimating tagwise precision across batches in parallel.\n")
-      tagwise_phi_lst <- parallel::mclapply(
-        seq_len(n_batch), 
-        est_phi_batch,
-        mc.cores = num_cores
+      old_plan <- future::plan()
+      future::plan(future::multisession, workers = num_cores)
+      on.exit(future::plan(old_plan), add = TRUE)
+      tagwise_phi_lst <- future.apply::future_lapply(
+        seq_len(n_batch), est_phi_batch, future.seed = TRUE
       )
+      future::plan(old_plan)
     } else {
       tagwise_phi_lst <- lapply(
         seq_len(n_batch), 
