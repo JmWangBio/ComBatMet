@@ -274,33 +274,50 @@ ComBat_met <- function(vmat, dtype = "b-value",
   # ----------------------------------------------------------------
   # Step 1: identify tags with zero model variance
   # ----------------------------------------------------------------
-  zero_modvar_vec       <- logical(nrow(bv))
-  zero_modvar_batch_vec <- logical(nrow(bv))
   NA_vec <- apply(bv, 1, function(x) anyNA(x))
   
-  for (k in seq_len(nrow(bv))) {
+  check_one_tag <- function(k) {
     full_mat <- cbind(design, bv[k, ])
     nona     <- which(stats::complete.cases(full_mat))
+    zv  <- FALSE
+    zvb <- FALSE
     if (length(nona) == 0 ||
         qr(full_mat[nona, ])$rank < ncol(full_mat)) {
-      zero_modvar_vec[k] <- TRUE
-      next
+      zv <- TRUE
+      return(c(zv = 1L, zvb = 0L))
     }
     if (!mean.only.vec[k]) {
       for (i in seq_along(batches_ind)) {
         idx <- intersect(batches_ind[[i]], nona)
         sub <- full_mat[idx, c(i, (n_batch + 1):ncol(full_mat)), drop = FALSE]
         if (qr(sub)$rank < ncol(full_mat) - n_batch + 1) {
-          zero_modvar_batch_vec[k] <- TRUE
+          zvb <- TRUE
           break
         }
       }
     }
+    c(zv = as.integer(zv), zvb = as.integer(zvb))
   }
+  
+  if (num_cores > 1L) {
+    old_plan <- future::plan()
+    future::plan(future::multisession, workers = num_cores)
+    on.exit(future::plan(old_plan), add = TRUE)
+    check_res <- future.apply::future_lapply(
+      seq_len(nrow(bv)), check_one_tag,
+      future.seed = NULL
+    )
+    future::plan(old_plan)
+  } else {
+    check_res <- lapply(seq_len(nrow(bv)), check_one_tag)
+  }
+  
+  zero_modvar_vec       <- as.logical(sapply(check_res, function(x) x["zv"]))
+  zero_modvar_batch_vec <- as.logical(sapply(check_res, function(x) x["zvb"]))
   
   n_zero_modvar       <- sum(zero_modvar_vec)
   n_zero_modvar_batch <- sum(zero_modvar_batch_vec)
-  n_NA   <- sum(NA_vec)
+  n_NA                <- sum(NA_vec)
   
   fittable <- which(!zero_modvar_vec & !zero_modvar_batch_vec & !NA_vec)
   
