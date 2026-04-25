@@ -270,46 +270,28 @@ ComBat_met <- function(vmat, dtype = "b-value",
   }
   num_cores <- max(1, parallel::detectCores() - 1)
   num_cores <- min(ncores, num_cores)
+  options(future.globals.maxSize = 4 * 1024^3)  # allow up to 4 GiB per worker
   
   # ----------------------------------------------------------------
   # Step 1: identify tags with zero model variance
   # ----------------------------------------------------------------
   NA_vec <- apply(bv, 1, function(x) anyNA(x))
   
-  check_one_tag <- function(k) {
-    full_mat <- cbind(design, bv[k, ])
-    nona     <- which(stats::complete.cases(full_mat))
-    zv  <- FALSE
-    zvb <- FALSE
-    if (length(nona) == 0 ||
-        qr(full_mat[nona, ])$rank < ncol(full_mat)) {
-      zv <- TRUE
-      return(c(zv = 1L, zvb = 0L))
-    }
-    if (!mean.only.vec[k]) {
-      for (i in seq_along(batches_ind)) {
-        idx <- intersect(batches_ind[[i]], nona)
-        sub <- full_mat[idx, c(i, (n_batch + 1):ncol(full_mat)), drop = FALSE]
-        if (qr(sub)$rank < ncol(full_mat) - n_batch + 1) {
-          zvb <- TRUE
-          break
-        }
-      }
-    }
-    c(zv = as.integer(zv), zvb = as.integer(zvb))
-  }
-  
   if (num_cores > 1L) {
     old_plan <- future::plan()
     future::plan(future::multisession, workers = num_cores)
     on.exit(future::plan(old_plan), add = TRUE)
     check_res <- future.apply::future_lapply(
-      seq_len(nrow(bv)), check_one_tag,
+      seq_len(nrow(bv)), .check_one_tag,
+      bv = bv, design = design, batches_ind = batches_ind,
+      n_batch = n_batch, mean.only.vec = mean.only.vec,
       future.seed = NULL
     )
     future::plan(old_plan)
   } else {
-    check_res <- lapply(seq_len(nrow(bv)), check_one_tag)
+    check_res <- lapply(seq_len(nrow(bv)), .check_one_tag,
+                        bv = bv, design = design, batches_ind = batches_ind,
+                        n_batch = n_batch, mean.only.vec = mean.only.vec)
   }
   
   zero_modvar_vec       <- as.logical(sapply(check_res, function(x) x["zv"]))
@@ -320,6 +302,7 @@ ComBat_met <- function(vmat, dtype = "b-value",
   n_NA                <- sum(NA_vec)
   
   fittable <- which(!zero_modvar_vec & !zero_modvar_batch_vec & !NA_vec)
+  chunk_size <- max(1L, ceiling(length(fittable) / num_cores))
   
   # ----------------------------------------------------------------
   # Step 2: estimate tagwise precision within each batch
@@ -341,36 +324,63 @@ ComBat_met <- function(vmat, dtype = "b-value",
     phi_all[fittable] <- phi_t_all
     tagwise_phi_lst <- lapply(seq_len(n_batch), function(j) phi_all)
   } else {
-    est_phi_batch <- function(j, verbose = FALSE) {
-      if (verbose) cat(paste0("Batch ", j, "\n"))
-      phi_j    <- rep(NA_real_, nrow(bv))
-      idx_all  <- batches_ind[[j]]
-      bv_b     <- bv[fittable, idx_all, drop = FALSE]
-      des_b    <- if (batch_has_df(j)) mod[idx_all, , drop = FALSE]
-      else                 matrix(1, n_batches[j], 1)
-      
-      phi_c <- estimateGLMCommonDispBeta(bv_b, design = des_b)
-      phi_t <- estimateGLMTagwiseDispBeta(bv_b, design = des_b,
-                                          phi_common = phi_c)
-      phi_j[fittable] <- phi_t
-      phi_j
+    tag_chunks <- split(fittable,
+                        ceiling(seq_along(fittable) / chunk_size))
+    n_chunks <- length(tag_chunks)
+    
+    tasks <- vector("list", n_batch * n_chunks)
+    idx   <- 1L
+    for (j in seq_len(n_batch)) {
+      for (c in seq_len(n_chunks)) {
+        tasks[[idx]] <- list(j = j, chunk_tags = tag_chunks[[c]])
+        idx <- idx + 1L
+      }
     }
+    
+    phi_common_per_batch <- sapply(seq_len(n_batch), function(j) {
+      bv_b  <- bv[fittable, batches_ind[[j]], drop = FALSE]
+      des_b <- if (batch_has_df(j)) mod[batches_ind[[j]], , drop = FALSE]
+      else                 matrix(1, n_batches[j], 1)
+      estimateGLMCommonDispBeta(bv_b, design = des_b)
+    })
     
     if (num_cores > 1L) {
       cat("Estimating tagwise precision across batches in parallel.\n")
       old_plan <- future::plan()
       future::plan(future::multisession, workers = num_cores)
       on.exit(future::plan(old_plan), add = TRUE)
-      tagwise_phi_lst <- future.apply::future_lapply(
-        seq_len(n_batch), est_phi_batch, future.seed = TRUE
+      task_res <- future.apply::future_lapply(
+        tasks, .est_phi_task, 
+        bv = bv,
+        batches_ind = batches_ind,
+        mod = mod,
+        n_batches = n_batches,
+        batchmod = batchmod,
+        design = design,
+        phi_common_per_batch = phi_common_per_batch,
+        future.seed = NULL
       )
       future::plan(old_plan)
     } else {
-      tagwise_phi_lst <- lapply(
-        seq_len(n_batch), 
-        function(j) est_phi_batch(j, verbose = TRUE)
-      )
+      task_res <- lapply(tasks, .est_phi_task,
+                         bv = bv,
+                         batches_ind = batches_ind,
+                         mod = mod,
+                         n_batches = n_batches,
+                         batchmod = batchmod,
+                         design = design,
+                         phi_common_per_batch = phi_common_per_batch,
+                         verbose = TRUE)
     }
+    
+    tagwise_phi_lst <- lapply(seq_len(n_batch), function(j) {
+      phi_j <- rep(NA_real_, nrow(bv))
+      for (res in task_res) {
+        if (res$j == j)
+          phi_j[res$chunk_tags] <- res$phi_t
+      }
+      phi_j
+    })
   }
   names(tagwise_phi_lst) <- paste0("batch", levels(batch))
   
@@ -526,17 +536,43 @@ ComBat_met <- function(vmat, dtype = "b-value",
   ########  Adjust the data  ########
   cat("Adjusting the data\n")
   adj_bv_raw <- matrix(NA, nrow = nrow(bv), ncol = ncol(bv))
-  for (kk in 1:n_batch) {
-    bv_sub <- bv[, batches_ind[[kk]], drop = FALSE]
-    old_mu <- mu_hat_mat[, batches_ind[[kk]], drop = FALSE]
-    old_phi <- phi_hat_mat[, batches_ind[[kk]], drop = FALSE] * exp(delta_hat_mat[, kk])
-    new_mu <- mu_star_mat[, batches_ind[[kk]], drop = FALSE]
-    new_phi <- phi_star_mat[, batches_ind[[kk]], drop = FALSE]
-    adj_bv_raw[, batches_ind[[kk]]] <- match_quantiles_beta(bv_sub = bv_sub,
-                                                            old_mu = old_mu, 
-                                                            old_phi = old_phi, 
-                                                            new_mu = new_mu, 
-                                                            new_phi = new_phi)
+  
+  # split rows into chunks for parallel quantile mapping
+  all_rows    <- seq_len(nrow(bv))
+  row_chunks  <- split(all_rows,
+                       ceiling(seq_along(all_rows) / chunk_size))
+  
+  if (num_cores > 1L) {
+    old_plan <- future::plan()
+    future::plan(future::multisession, workers = num_cores)
+    on.exit(future::plan(old_plan), add = TRUE)
+    chunk_res <- future.apply::future_lapply(
+      row_chunks, .adjust_chunk, 
+      bv = bv,
+      mu_hat_mat = mu_hat_mat,
+      phi_hat_mat = phi_hat_mat,
+      delta_hat_mat = delta_hat_mat,
+      mu_star_mat = mu_star_mat,
+      phi_star_mat = phi_star_mat,
+      batches_ind = batches_ind,
+      n_batch = n_batch,
+      future.seed = NULL
+    )
+    future::plan(old_plan)
+  } else {
+    chunk_res <- lapply(row_chunks, .adjust_chunk,
+                        bv = bv,
+                        mu_hat_mat = mu_hat_mat,
+                        phi_hat_mat = phi_hat_mat,
+                        delta_hat_mat = delta_hat_mat,
+                        mu_star_mat = mu_star_mat,
+                        phi_star_mat = phi_star_mat,
+                        batches_ind = batches_ind,
+                        n_batch = n_batch)
+  }
+  
+  for (ci in seq_along(row_chunks)) {
+    adj_bv_raw[row_chunks[[ci]], ] <- chunk_res[[ci]]
   }
   
   ## Add back features with values unqualified for beta regression  
