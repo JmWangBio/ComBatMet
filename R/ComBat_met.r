@@ -271,6 +271,11 @@ ComBat_met <- function(vmat, dtype = "b-value",
   num_cores <- max(1, parallel::detectCores() - 1)
   num_cores <- min(ncores, num_cores)
   options(future.globals.maxSize = 4 * 1024^3)  # allow up to 4 GiB per worker
+  if (num_cores > 1L) {
+    old_plan <- future::plan()
+    future::plan(future::multisession, workers = num_cores)
+    on.exit(future::plan(old_plan), add = TRUE)
+  }
   
   # ----------------------------------------------------------------
   # Step 1: identify tags with zero model variance
@@ -278,16 +283,12 @@ ComBat_met <- function(vmat, dtype = "b-value",
   NA_vec <- apply(bv, 1, function(x) anyNA(x))
   
   if (num_cores > 1L) {
-    old_plan <- future::plan()
-    future::plan(future::multisession, workers = num_cores)
-    on.exit(future::plan(old_plan), add = TRUE)
     check_res <- future.apply::future_lapply(
       seq_len(nrow(bv)), .check_one_tag,
       bv = bv, design = design, batches_ind = batches_ind,
       n_batch = n_batch, mean.only.vec = mean.only.vec,
       future.seed = NULL
     )
-    future::plan(old_plan)
   } else {
     check_res <- lapply(seq_len(nrow(bv)), .check_one_tag,
                         bv = bv, design = design, batches_ind = batches_ind,
@@ -346,9 +347,6 @@ ComBat_met <- function(vmat, dtype = "b-value",
     
     if (num_cores > 1L) {
       cat("Estimating tagwise precision across batches in parallel.\n")
-      old_plan <- future::plan()
-      future::plan(future::multisession, workers = num_cores)
-      on.exit(future::plan(old_plan), add = TRUE)
       task_res <- future.apply::future_lapply(
         tasks, .est_phi_task, 
         bv = bv,
@@ -360,7 +358,6 @@ ComBat_met <- function(vmat, dtype = "b-value",
         phi_common_per_batch = phi_common_per_batch,
         future.seed = NULL
       )
-      future::plan(old_plan)
     } else {
       task_res <- lapply(tasks, .est_phi_task,
                          bv = bv,
@@ -543,9 +540,6 @@ ComBat_met <- function(vmat, dtype = "b-value",
                        ceiling(seq_along(all_rows) / chunk_size))
   
   if (num_cores > 1L) {
-    old_plan <- future::plan()
-    future::plan(future::multisession, workers = num_cores)
-    on.exit(future::plan(old_plan), add = TRUE)
     chunk_res <- future.apply::future_lapply(
       row_chunks, .adjust_chunk, 
       bv = bv,
@@ -558,7 +552,6 @@ ComBat_met <- function(vmat, dtype = "b-value",
       n_batch = n_batch,
       future.seed = NULL
     )
-    future::plan(old_plan)
   } else {
     chunk_res <- lapply(row_chunks, .adjust_chunk,
                         bv = bv,
