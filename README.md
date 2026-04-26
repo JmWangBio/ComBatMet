@@ -14,7 +14,9 @@ provided at the bottom of this page.
 
 - **Outperforms existing methods.** ComBat-met consistently removes more batch-associated variation while preserving biological signals, achieving higher statistical power without inflating false positive rates.
 
-- **Fast.** A dataset with 900,000 methylation sites (e.g., Illumina EPIC v2 array) across 8 samples finishes in under 2 minutes.
+- **Fast.** A dataset with 900,000 methylation sites (e.g., Illumina EPIC v2 array) across 8 samples finishes in under one minute on a single core.
+
+- **Scalable.** ComBat-met handles 100 samples (900,000 sites) in just 4 minutes using 9 cores.
 
 ComBat-met was published in NAR Genomics and Bioinformatics. Whenever using ComBat-met, please cite:
 
@@ -216,6 +218,8 @@ from the TCGA data as shown in the manuscript are stored in the “inst” folde
 ## Key Updates
 
 April, 2026: The core parameter estimation engine has been rewritten in C++ with LAPACK/BLAS routines, eliminating the `betareg` dependency. Precision is now estimated within each batch using a fast grid-based search. A dataset of 900,000 methylation sites across 8 samples now completes in under 2 minutes. Parallelisation across batches is supported via the `ncores` argument. This improvement was inspired by the GLM regression framework in edgeR and ComBat-seq.
+
+April, 2026 (cont.): Improved code efficiency significantly reduces runtimes. 900k methylation sites across 8 samples now complete in under one minute (single-core), while 100 samples finish in 4 minutes (9 cores).
 
 ## Contribute
 
