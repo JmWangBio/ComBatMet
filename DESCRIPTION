@@ -26,7 +26,7 @@ Imports:
     future,
     future.apply
 Suggests:
-    methylKit, BiocStyle, knitr, rmarkdown
+    methylKit, BiocStyle, knitr, rmarkdown, betareg
 biocViews: DNAMethylation, Epigenetics, MethylationArray, MethylSeq, BatchEffect, Normalization, Software, StatisticalMethod
 VignetteBuilder: knitr
 URL: https://github.com/JmWangBio/ComBatMet

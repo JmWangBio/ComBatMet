@@ -16,7 +16,8 @@ ComBat_met(
   feature.subset.n = NULL,
   pseudo_beta = 1e-04,
   ref.batch = NULL,
-  ncores = 1
+  ncores = 1,
+  use_cpp = TRUE
 )
 }
 \arguments{
@@ -44,6 +45,8 @@ Value needs to be between 0 and 0.5. Only active when dtype equals b-value.}
 \item{ref.batch}{NULL by default. If given, that batch will be selected as a reference for batch correction.}
 
 \item{ncores}{number of cores to be used for parallel computing. By default, ncores is set to one.}
+
+\item{use_cpp}{logical; if TRUE (default), use fast C++ routines for parameter estimation. If FALSE, use the original betareg-based approach.}
 }
 \value{
 \code{ComBat_met} returns a feature x sample matrix with the same data type as input, adjusted for batch effects.
