@@ -7,11 +7,6 @@ ComBatMet
 Junmin Wang
 05/09/2026
 
-This page aims to present ComBat-met in an accessible way for a broad 
-audience. For those interested in reproducing 
-the results in the manuscript, code descriptions are 
-provided at the bottom of this page.
-
 ## Why Use ComBat-met?
 
 - **Built for methylation data.** Beta-values are bounded between 0 and 1 and have skewed properties that Gaussian-based methods cannot properly handle. ComBat-met uses a beta regression framework that respects the true distributional structure of methylation data.
@@ -219,11 +214,31 @@ from the TCGA data as shown in the manuscript are stored in the “inst” folde
   </tbody>
 </table>
 
-## Key Updates
+## Common Q & A
 
-April, 2026: The core parameter estimation engine has been rewritten in C++ with LAPACK/BLAS routines, eliminating the `betareg` dependency. Precision is now estimated within each batch using a fast grid-based search. A dataset of 900,000 methylation sites across 8 samples now completes in under 2 minutes. Parallelisation across batches is supported via the `ncores` argument. This improvement was inspired by the GLM regression framework in edgeR and ComBat-seq.
+**Q: Can I provide M-values as input?**
 
-April, 2026 (cont.): Improved code efficiency significantly reduces runtimes. 900k methylation sites across 8 samples now complete in under one minute (single-core), while 100 samples finish in 4 minutes (9 cores).
+A: Yes. ComBat-met accepts both beta-values and M-values. Set `dtype = "M-value"` when calling `ComBat_met()`, and the output will also be M-values.
+
+**Q: Does ComBat-met work on unbalanced experimental designs?**
+
+A: Yes. ComBat-met handles unbalanced designs where batches differ in sample size.
+
+**Q: How long does ComBat-met take to run?**
+
+A: Runtime depends on the size of your dataset and the computing resources available. A dataset with 900,000 methylation sites (e.g., Illumina EPIC v2 array) across 8 samples completes in under one minute on a single core. You can further reduce runtime via parallelisation by setting `ncores` to the number of available cores — 900,000 sites across 100 samples finishes in approximately 4 minutes using 9 cores.
+
+**Q: Is ComBat-met compatible with RNA methylation data?**
+
+A: Yes, `ComBat_met()` can be applied to RNA methylation data. However, keep in mind that unlike DNA methylation, RNA methylation coverage varies widely because it is tied to transcript abundance. In such cases, `ComBat_biseq()`, which explicitly models uncertainty from variable read depth, may be better suited.
+
+**Q: How does ComBat-met handle beta regression?**
+
+A: The current implementation uses C++ routines with LAPACK/BLAS kernels, inspired by the GLM regression framework in edgeR and ComBat-seq. Precision is estimated within each batch via a fast grid-based search, replacing the original `betareg`-based engine. As demonstrated in the vignettes, adjusted values from the old and new implementations are 99% correlated, confirming that the speedup comes with no meaningful loss of accuracy. If you prefer to use the original `betareg` implementation for any reason, you can do so by setting `use_cpp = FALSE`.
+
+**Q: Does ComBat-met work across operating systems?**
+
+A: Yes. ComBat-met is tested on macOS, Windows, and Linux via GitHub Actions CI, and passes checks on all three platforms.
 
 ## Contribute
 
