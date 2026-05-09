@@ -5,11 +5,11 @@
 ComBatMet
 ================
 Junmin Wang
-04/19/2026
+05/09/2026
 
 This page aims to present ComBat-met in an accessible way for a broad 
-audience. For those interested in implementing ComBat-met or reproducing 
-the results in the manuscript, detailed prerequisites and code descriptions are 
+audience. For those interested in reproducing 
+the results in the manuscript, code descriptions are 
 provided at the bottom of this page.
 
 ## Why Use ComBat-met?
@@ -26,6 +26,42 @@ ComBat-met was published in NAR Genomics and Bioinformatics. Whenever using ComB
 
 > Wang J. ComBat-met: Adjusting Batch Effects in DNA Methylation Data. *NAR Genom Bioinform*. 2025 May 19;7(2): lqaf062.
 > DOI: [https://doi.org/10.1093/nargab/lqaf062](https://doi.org/10.1093/nargab/lqaf062)
+
+## Installation and Usage
+
+You can install ComBatMet like so:
+
+``` r
+library(devtools)
+install_github("JmWangBio/ComBatMet")
+```
+
+Next, I will provide an example to demonstrate how to get started with this package.
+First, let’s simulate some DNA methylation data. Suppose that in a hypothetical methylation 
+study of cancer, 50 probes/sites are quantified. The diseased group (i.e., D) and healthy 
+group (i.e., H) has four replicates each. Two replicates belong to batch 1, and the other 
+two replicates, batch 2.
+
+``` r
+# Load library
+library(ComBatMet)
+
+# Generate a random beta-value matrix
+bv_mat <- matrix(runif(n = 400, min = 0, max = 1), nrow = 50, ncol = 8)
+batch <- c(rep(1, 4), rep(2, 4))
+group <- rep(c(0, 1), 4)
+```
+
+Now let's adjust for batch effects.
+
+``` r
+# Adjust for batch effects including biological conditions
+adj_bv_mat <- ComBat_met(bv_mat, batch = batch, group = group, full_mod = TRUE)
+```
+
+The example above provides a simple introduction to get you started. For more detailed examples, 
+including reference-batch correction, parallelization, and other advanced features, please refer 
+to the vignette.
 
 ## Introduction
 
@@ -109,42 +145,6 @@ correction in methylation studies (Fig. 4).
 
 **Fig. 4.** Architecture of the neural network used for classification; box plot comparing 
 classification accuracy before and after batch adjustment using ComBat-met.
-
-## Installation and Usage
-
-You can install ComBatMet like so:
-
-``` r
-library(devtools)
-install_github("JmWangBio/ComBatMet")
-```
-
-Next, I will provide an example to demonstrate how to get started with this package.
-First, let’s simulate some DNA methylation data. Suppose that in a hypothetical methylation 
-study of cancer, 50 probes/sites are quantified. The diseased group (i.e., D) and healthy 
-group (i.e., H) has four replicates each. Two replicates belong to batch 1, and the other 
-two replicates, batch 2.
-
-``` r
-# Load library
-library(ComBatMet)
-
-# Generate a random beta-value matrix
-bv_mat <- matrix(runif(n = 400, min = 0, max = 1), nrow = 50, ncol = 8)
-batch <- c(rep(1, 4), rep(2, 4))
-group <- rep(c(0, 1), 4)
-```
-
-Now let's adjust for batch effects.
-
-``` r
-# Adjust for batch effects including biological conditions
-adj_bv_mat <- ComBat_met(bv_mat, batch = batch, group = group, full_mod = TRUE)
-```
-
-The example above provides a simple introduction to get you started. For more detailed examples, 
-including reference-batch correction, parallelization, and other advanced features, please refer 
-to the vignette.
 
 ## Code Descriptions
 
