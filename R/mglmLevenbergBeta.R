@@ -6,7 +6,7 @@
 mglmLevenbergBeta <- function(y, design, phi, weights=NULL,
                               coef.start=NULL, maxit=200L, tol=1e-06)
   # y          matrix of proportions (ntags x nsamples), each in (0,1)
-  # design     design matrix (ntags x ncoef)
+  # design     design matrix (nsamples x ncoef)
   # phi        matrix of dim(y): precision per tag x sample
   # weights    optional weight matrix of dim(y)
   # coef.start optional starting coefficients (ntags x ncoef)
