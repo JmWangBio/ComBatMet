@@ -73,7 +73,7 @@ dispCoxReidInterpolateTagwiseBeta <- function(y, design, phi_common,
                                   maxit=maxit.grid,
                                   tol=tol.grid)
     apl[, i] <- out$apl
-    last.beta <- out$beta
+    beta_cache[[i]] <- out$beta
   }
 
   # Tag-by-tag spline maximization.
