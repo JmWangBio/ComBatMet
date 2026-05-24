@@ -219,7 +219,7 @@ ComBat_biseq <- function(numCs, coverage, batch, group = NULL, covar_mod = NULL,
                                     coverage = coverage[k, ], 
                                     numCs = numCs[k, ]))
     full_mat$coverage[full_mat$coverage == 0] <- NA
-    full_mat$numCs[full_mat$coverage == 0] <- NA
+    full_mat$numCs[is.na(full_mat$coverage)] <- NA
     nona <- which(stats::complete.cases(full_mat))
     
     # check if the data are all NAs
