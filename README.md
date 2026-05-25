@@ -5,7 +5,7 @@
 ComBatMet
 ================
 Junmin Wang
-05/09/2026
+05/25/2026
 
 ## Why Use ComBat-met?
 
@@ -16,6 +16,8 @@ Junmin Wang
 - **Fast.** A dataset with 900,000 methylation sites (e.g., Illumina EPIC v2 array) across 8 samples finishes in under one minute on a single core.
 
 - **Scalable.** ComBat-met handles 100 samples (900,000 sites) in just 4 minutes using 9 cores.
+
+- **Works with both array and sequencing data.** ComBat-met supports beta-values from methylation arrays (e.g., Illumina EPIC) via `ComBat_met()`, and cytosine count data from NGS via `ComBat_biseq()`.
 
 ComBat-met was published in NAR Genomics and Bioinformatics. Whenever using ComBat-met, please cite:
 
@@ -228,13 +230,17 @@ A: Yes. ComBat-met handles unbalanced designs where batches differ in sample siz
 
 A: Runtime depends on the size of your dataset and the computing resources available. A dataset with 900,000 methylation sites (e.g., Illumina EPIC v2 array) across 8 samples completes in under one minute on a single core. You can further reduce runtime via parallelisation by setting `ncores` to the number of available cores — 900,000 sites across 100 samples finishes in approximately 4 minutes using 9 cores.
 
+**Q: Can I use ComBat-met to adjust sequencing read counts directly?**
+
+A: Yes, via `ComBat_biseq()`, which uses a beta-binomial regression framework that explicitly models the uncertainty from variable read depth. A dataset with 1 million methylation sites across 8 samples finishes in approximately 4 minutes on a single core; 1 million sites across 100 samples (10 batches) finishes in approximately 11 minutes using 9 cores.
+
 **Q: Is ComBat-met compatible with RNA methylation data?**
 
-A: Yes, `ComBat_met()` can be applied to RNA methylation data. However, keep in mind that unlike DNA methylation, RNA methylation coverage varies widely because it is tied to transcript abundance. In such cases, `ComBat_biseq()`, which explicitly models uncertainty from variable read depth, may be better suited.
+A: Yes, `ComBat_met()` can be applied to RNA methylation data. However, keep in mind that unlike DNA methylation, RNA methylation coverage varies widely because it is tied to transcript abundance. In such cases, `ComBat_biseq()` may be better suited.
 
 **Q: How does ComBat-met handle beta regression?**
 
-A: The current implementation uses C++ routines with LAPACK/BLAS kernels, inspired by the GLM regression framework in edgeR and ComBat-seq. Precision is estimated within each batch via a fast grid-based search, replacing the original `betareg`-based engine. As demonstrated in the vignettes, adjusted values from the old and new implementations are 99% correlated, confirming that the speedup comes with no meaningful loss of accuracy. If you prefer to use the original `betareg` implementation for any reason, you can do so by setting `use_cpp = FALSE`.
+A: The current implementation uses C++ routines with LAPACK/BLAS kernels, inspired by the GLM regression framework in edgeR and ComBat-seq. Precision is estimated within each batch via a fast grid-based search, replacing the original `betareg`-based engine. As demonstrated in the vignettes, adjusted values from the old and new implementations are 99% correlated, confirming that the speedup comes with no meaningful loss of accuracy. If you prefer to use the original `betareg` implementation for any reason, you can do so by setting `use_cpp = FALSE`. `ComBat_biseq()` handles beta-binomial regression in a similar way.
 
 **Q: Does ComBat-met work across operating systems?**
 
