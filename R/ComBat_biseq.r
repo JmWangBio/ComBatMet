@@ -10,6 +10,7 @@
 #' @param batch vector for batch
 #' @param group optional vector for biological condition of interest
 #' @param covar_mod optional model matrix representing co-variates to be included in the model
+#' @param use_cpp logical; if TRUE (default), use fast C++ routines for parameter estimation. If FALSE, use the original aod-based approach.
 #' 
 #' @return \code{ComBat_biseq} returns a batch-adjusted feature x sample count matrix, representing number
 #' of methylated cytosines
@@ -42,7 +43,7 @@
 
 ComBat_biseq <- function(numCs, coverage, batch, group = NULL, covar_mod = NULL, full_mod = TRUE, 
                          shrink = FALSE, mean.only = FALSE, feature.subset.n = NULL,
-                         ncores = 1) {  
+                         ncores = 1, use_cpp = TRUE) {  
   ########  Preparation  ########
   ## Check if numCs is a matrix of number of methylated cystosines
   if (!(is.matrix(numCs) && is.numeric(numCs))) {
@@ -108,8 +109,8 @@ ComBat_biseq <- function(numCs, coverage, batch, group = NULL, covar_mod = NULL,
   
   ## Remove features with zero variance across all batches
   zero.var.rows.lst <- lapply(levels(batch), function(b) {
-    intersect(which(apply(coverage[, batch == b], 1, function(x){stats::var(x, na.rm = TRUE) == 0})), 
-              which(apply(numCs[, batch == b], 1, function(x){stats::var(x, na.rm = TRUE) == 0})))
+    intersect(which(apply(coverage[, batch == b, drop = FALSE], 1, function(x){stats::var(x, na.rm = TRUE) == 0})), 
+              which(apply(numCs[, batch == b, drop = FALSE], 1, function(x){stats::var(x, na.rm = TRUE) == 0})))
   })
   all.zero.var.rows <- Reduce(intersect, zero.var.rows.lst)
   
@@ -201,96 +202,267 @@ ComBat_biseq <- function(numCs, coverage, batch, group = NULL, covar_mod = NULL,
   
   ########  Estimate parameters from beta-binomial GLM  ########
   cat("Fitting the GLM model\n")
-
+  
   if (!is.numeric(ncores) || ncores != as.integer(ncores) || ncores <= 0) {
     stop("ncores must be a positive integer.")
   }
   num_cores <- max(1, parallel::detectCores() - 1)
   num_cores <- min(ncores, num_cores)
-  cl <- parallel::makeCluster(num_cores)
   
-  # define the function to be applied in parallel
-  param_estim <- function(k) {
-    result <- list(gamma_hat = NULL, mu_hat = NULL, phi_hat = NULL, delta_hat = NULL,
-                   zero_modvar = 0)
-    
-    # mark rows with NA values and zero coverage
-    full_mat <- as.data.frame(cbind(design, 
-                                    coverage = coverage[k, ], 
-                                    numCs = numCs[k, ]))
-    full_mat$coverage[full_mat$coverage == 0] <- NA
-    full_mat$numCs[is.na(full_mat$coverage)] <- NA
-    nona <- which(stats::complete.cases(full_mat))
-    
-    # check if the data are all NAs
-    if (length(nona) == 0) {
-      result$zero_modvar <- 1
-      return(result)
+  all_rows   <- seq_len(nrow(numCs))
+  chunk_size <- max(1L, ceiling(nrow(numCs) / num_cores))
+  row_chunks <- split(all_rows, ceiling(seq_along(all_rows) / chunk_size))
+  
+  if (use_cpp) {
+    options(future.globals.maxSize = +Inf)
+    if (num_cores > 1L) {
+      old_plan <- future::plan()
+      future::plan(future::multisession, workers = num_cores)
+      on.exit(future::plan(old_plan), add = TRUE)
     }
     
-    # check if the model has zero model variance
-    full_ratio <- full_mat$numCs / full_mat$coverage
-    if (qr(cbind(full_mat[, 1:(ncol(full_mat) - 2)], full_ratio)[nona, ])$rank < ncol(full_mat) - 1)  {
-      result$zero_modvar <- 1
-      return(result)
-    }
+    # ----------------------------------------------------------------
+    # Step 1: identify tags with zero model variance
+    # ----------------------------------------------------------------
+    check_inputs <- lapply(row_chunks, function(rows) {
+      list(
+        numCs_chunk   = numCs[rows, , drop = FALSE],
+        cov_chunk     = coverage[rows, , drop = FALSE],
+        design        = design,
+        mean_only_vec = mean.only.vec[rows]
+      )
+    })
     
-    # model fit
-    full_df <- as.data.frame(full_mat)
-    
-    if (mean.only.vec[k]) {
-      glm_f <- aod::betabin(cbind(numCs, coverage - numCs) ~ -1 + ., 
-                            ~ 1, 
-                            data = full_df[nona, ])
+    if (num_cores > 1L) {
+      check_res <- future.apply::future_lapply(
+        check_inputs, .check_one_tag_bb,
+        batches_ind = batches_ind,
+        n_batch     = n_batch,
+        future.seed = NULL)
     } else {
-      batch_nona <- batch[nona]
-      glm_f <- aod::betabin(cbind(numCs, coverage - numCs) ~ -1 + ., 
-                            ~ batch_nona, 
-                            data = full_df[nona, ])
+      check_res <- lapply(check_inputs, .check_one_tag_bb,
+                          batches_ind = batches_ind,
+                          n_batch     = n_batch)
     }
     
-    # compute mean and precision intercepts as batch-size-weighted average from batches
-    alpha_x <- as.numeric(aod::coef(glm_f)[1:n_batch] %*% 
-                            as.matrix(colSums(batchmod[nona, ]) / length(nona)))
-    if (mean.only.vec[k]) {
-      alpha_z <- as.numeric(log(1 / glm_f@random.param - 1))
+    zero_modvar_vec <- logical(nrow(numCs))
+    for (ci in seq_along(row_chunks))
+      zero_modvar_vec[row_chunks[[ci]]] <- check_res[[ci]]$zv
+    
+    NA_vec        <- apply(numCs, 1, anyNA) | apply(coverage, 1, anyNA)
+    n_NA          <- sum(NA_vec)
+    n_zero_modvar <- sum(zero_modvar_vec)
+    fittable      <- which(!zero_modvar_vec & !NA_vec)
+    chunk_size    <- max(1L, ceiling(length(fittable) / num_cores))
+    
+    # ----------------------------------------------------------------
+    # Step 2: estimate tagwise precision within each batch
+    # ----------------------------------------------------------------
+    cat("Estimating precisions\n")
+    
+    batch_has_df <- function(j) {
+      n_batches[j] > (ncol(design) - ncol(batchmod) + 1) &&
+        qr(mod[batches_ind[[j]], , drop = FALSE])$rank == ncol(mod)
+    }
+    
+    if (mean.only) {
+      phi_c_all <- estimateGLMCommonDispBetaBin(
+        numCs[fittable, , drop = FALSE],
+        n      = coverage[fittable, , drop = FALSE],
+        design = mod)
+      phi_t_all <- estimateGLMTagwiseDispBetaBin(
+        numCs[fittable, , drop = FALSE],
+        n          = coverage[fittable, , drop = FALSE],
+        design     = mod,
+        phi_common = phi_c_all)
+      phi_all           <- rep(NA_real_, nrow(numCs))
+      phi_all[fittable] <- phi_t_all
+      tagwise_phi_lst   <- lapply(seq_len(n_batch), function(j) phi_all)
     } else {
-      alpha_z <- as.numeric(log(1 / glm_f@random.param - 1) %*%
+      tag_chunks <- split(fittable,
+                          ceiling(seq_along(fittable) / chunk_size))
+      n_chunks   <- length(tag_chunks)
+      
+      tasks <- vector("list", n_batch * n_chunks)
+      idx   <- 1L
+      for (j in seq_len(n_batch)) {
+        idx_all <- batches_ind[[j]]
+        des_b   <- if (batch_has_df(j)) mod[idx_all, , drop = FALSE]
+        else                 matrix(1, n_batches[j], 1)
+        phi_c   <- estimateGLMCommonDispBetaBin(
+          numCs[fittable, idx_all, drop = FALSE],
+          n      = coverage[fittable, idx_all, drop = FALSE],
+          design = des_b)
+        for (ch in seq_len(n_chunks)) {
+          chunk_tags   <- tag_chunks[[ch]]
+          tasks[[idx]] <- list(
+            j          = j,
+            chunk_tags = chunk_tags,
+            numCs_b    = numCs[chunk_tags, idx_all, drop = FALSE],
+            cov_b      = coverage[chunk_tags, idx_all, drop = FALSE],
+            des_b      = des_b,
+            phi_c      = phi_c)
+          idx <- idx + 1L
+        }
+      }
+      
+      if (num_cores > 1L) {
+        cat("Estimating tagwise precision across batches in parallel.\n")
+        task_res <- future.apply::future_lapply(
+          tasks, .est_phi_task_bb, future.seed = NULL)
+      } else {
+        task_res <- lapply(tasks, .est_phi_task_bb, verbose = TRUE)
+      }
+      
+      tagwise_phi_lst <- lapply(seq_len(n_batch), function(j) {
+        phi_j <- rep(NA_real_, nrow(numCs))
+        for (res in task_res)
+          if (res$j == j) phi_j[res$chunk_tags] <- res$phi_t
+        phi_j
+      })
+    }
+    names(tagwise_phi_lst) <- paste0("batch", levels(batch))
+    
+    # ----------------------------------------------------------------
+    # Step 3: fit full-design beta-binomial GLM
+    # ----------------------------------------------------------------
+    phi_matrix <- matrix(NA_real_, nrow = nrow(numCs), ncol = ncol(numCs))
+    for (j in seq_len(n_batch))
+      phi_matrix[, batches_ind[[j]]] <- vec2mat(tagwise_phi_lst[[j]], n_batches[j])
+    
+    glm_f <- glmFitBetaBin(numCs[fittable, , drop = FALSE],
+                           n      = coverage[fittable, , drop = FALSE],
+                           design = design,
+                           phi    = phi_matrix[fittable, , drop = FALSE])
+    
+    # ----------------------------------------------------------------
+    # Step 4: compute gamma_hat, mu_hat, phi_hat, delta_hat
+    # ----------------------------------------------------------------
+    coef_fittable      <- glm_f$coefficients[, 1:n_batch, drop = FALSE]
+    alpha_x            <- coef_fittable %*% as.matrix(n_batches / n_sample)
+    gamma_hat_fittable <- coef_fittable - as.numeric(alpha_x)
+    mu_hat_fittable    <- glm_f$fitted.values
+    
+    log_phi_batch_fittable <- do.call(cbind,
+                                      lapply(tagwise_phi_lst, function(v) log(v[fittable])))
+    alpha_z            <- log_phi_batch_fittable %*% as.matrix(n_batches / n_sample)
+    delta_hat_fittable <- log_phi_batch_fittable - as.numeric(alpha_z)
+    phi_hat_fittable   <- matrix(exp(as.numeric(alpha_z)),
+                                 nrow = length(fittable), ncol = ncol(numCs))
+    
+    # ----------------------------------------------------------------
+    # Step 5: pack into full ntag-length lists
+    # ----------------------------------------------------------------
+    gamma_hat_lst <- vector("list", nrow(numCs))
+    mu_hat_lst    <- vector("list", nrow(numCs))
+    phi_hat_lst   <- vector("list", nrow(numCs))
+    delta_hat_lst <- vector("list", nrow(numCs))
+    
+    for (ii in seq_along(fittable)) {
+      k <- fittable[ii]
+      gamma_hat_lst[[k]] <- gamma_hat_fittable[ii, ]
+      mu_hat_lst[[k]]    <- mu_hat_fittable[ii, ]
+      phi_hat_lst[[k]]   <- phi_hat_fittable[ii, ]
+      delta_hat_lst[[k]] <- delta_hat_fittable[ii, ]
+    }
+    
+    cat(sprintf("Found %s features with missing values;
+                these features won't be adjusted for batch effects.\n", n_NA))
+    cat(sprintf("Found %s features with zero model variance;
+                these features won't be adjusted for batch effects.\n", n_zero_modvar))
+    
+  } else {
+    
+    if (!requireNamespace("aod", quietly = TRUE))
+      stop("Package 'aod' is required for use_cpp = FALSE. ",
+           "Please install it with: install.packages('aod')")
+    
+    cl <- parallel::makeCluster(num_cores)
+    
+    # define the function to be applied in parallel
+    param_estim <- function(k) {
+      result <- list(gamma_hat = NULL, mu_hat = NULL, phi_hat = NULL, delta_hat = NULL,
+                     zero_modvar = 0)
+      
+      # mark rows with NA values and zero coverage
+      full_mat <- as.data.frame(cbind(design, 
+                                      coverage = coverage[k, ], 
+                                      numCs = numCs[k, ]))
+      full_mat$coverage[full_mat$coverage == 0] <- NA
+      full_mat$numCs[is.na(full_mat$coverage)] <- NA
+      nona <- which(stats::complete.cases(full_mat))
+      
+      # check if the data are all NAs
+      if (length(nona) == 0) {
+        result$zero_modvar <- 1
+        return(result)
+      }
+      
+      # check if the model has zero model variance
+      full_ratio <- full_mat$numCs / full_mat$coverage
+      if (qr(cbind(full_mat[, 1:(ncol(full_mat) - 2)], full_ratio)[nona, ])$rank < ncol(full_mat) - 1)  {
+        result$zero_modvar <- 1
+        return(result)
+      }
+      
+      # model fit
+      full_df <- as.data.frame(full_mat)
+      
+      if (mean.only.vec[k]) {
+        glm_f <- aod::betabin(cbind(numCs, coverage - numCs) ~ -1 + ., 
+                              ~ 1, 
+                              data = full_df[nona, ])
+      } else {
+        batch_nona <- batch[nona]
+        glm_f <- aod::betabin(cbind(numCs, coverage - numCs) ~ -1 + ., 
+                              ~ batch_nona, 
+                              data = full_df[nona, ])
+      }
+      
+      # compute mean and precision intercepts as batch-size-weighted average from batches
+      alpha_x <- as.numeric(aod::coef(glm_f)[1:n_batch] %*% 
                               as.matrix(colSums(batchmod[nona, ]) / length(nona)))
+      if (mean.only.vec[k]) {
+        alpha_z <- as.numeric(log(1 / glm_f@random.param - 1))
+      } else {
+        alpha_z <- as.numeric(log(1 / glm_f@random.param - 1) %*%
+                                as.matrix(colSums(batchmod[nona, ]) / length(nona)))
+      }
+      
+      # estimate parameters
+      gamma_hat <- aod::coef(glm_f)[1:n_batch] - alpha_x
+      mu_hat <- rep(NA, nrow(full_mat))
+      mu_hat[nona] <- aod::fitted(glm_f)
+      phi_hat <- as.numeric(exp(alpha_z)) * rep(1, nrow(full_mat))
+      if (mean.only.vec[k]) {
+        delta_hat <- rep(0, n_batch)
+      } else {
+        delta_hat <- log(1 / glm_f@random.param - 1) - alpha_z
+      }
+      
+      # store result
+      result$gamma_hat <- gamma_hat
+      result$mu_hat <- mu_hat
+      result$phi_hat <- phi_hat
+      result$delta_hat <- delta_hat
+      return(result)
     }
     
-    # estimate parameters
-    gamma_hat <- aod::coef(glm_f)[1:n_batch] - alpha_x
-    mu_hat <- rep(NA, nrow(full_mat))
-    mu_hat[nona] <- aod::fitted(glm_f)
-    phi_hat <- as.numeric(exp(alpha_z)) * rep(1, nrow(full_mat))
-    if (mean.only.vec[k]) {
-      delta_hat <- rep(0, n_batch)
-    } else {
-      delta_hat <- log(1 / glm_f@random.param - 1) - alpha_z
-    }
+    # run in parallel
+    result_lst <- parallel::parLapply(cl, 1:nrow(coverage), param_estim)
+    parallel::stopCluster(cl)
     
-    # store result
-    result$gamma_hat <- gamma_hat
-    result$mu_hat <- mu_hat
-    result$phi_hat <- phi_hat
-    result$delta_hat <- delta_hat
-    return(result)
+    gamma_hat_lst <- lapply(result_lst, function(x) x$gamma_hat)
+    mu_hat_lst <- lapply(result_lst, function(x) x$mu_hat)
+    phi_hat_lst <- lapply(result_lst, function(x) x$phi_hat)
+    delta_hat_lst <- lapply(result_lst, function(x) x$delta_hat)
+    n_zero_modvar <- sum(unlist(lapply(result_lst, function(x) x$zero_modvar)))
+    
+    cat(sprintf("Found %s features with zero model variance;
+                these features won't be adjusted for batch effects.\n",
+                n_zero_modvar))
+    
   }
-  
-  # run in parallel
-  result_lst <- parallel::parLapply(cl, 1:nrow(coverage), param_estim)
-  parallel::stopCluster(cl)
-  
-  gamma_hat_lst <- lapply(result_lst, function(x) x$gamma_hat)
-  mu_hat_lst <- lapply(result_lst, function(x) x$mu_hat)
-  phi_hat_lst <- lapply(result_lst, function(x) x$phi_hat)
-  delta_hat_lst <- lapply(result_lst, function(x) x$delta_hat)
-  n_zero_modvar <- sum(unlist(lapply(result_lst, function(x) x$zero_modvar)))
-  
-  cat(sprintf("Found %s features with zero model variance;
-              these features won't be adjusted for batch effects.\n",
-              n_zero_modvar))
   
   # convert NULLs to NAs
   gamma_hat_lst[sapply(gamma_hat_lst, is.null)] <- NA
@@ -368,20 +540,33 @@ ComBat_biseq <- function(numCs, coverage, batch, group = NULL, covar_mod = NULL,
   ########  Adjust the data  ########
   cat("Adjusting the data\n")
   adj_numCs_raw <- matrix(NA, nrow = nrow(coverage), ncol = ncol(coverage))
-  for (kk in 1:n_batch) {
-    numCs_sub <- numCs[, batches_ind[[kk]]]
-    coverage_sub <- coverage[, batches_ind[[kk]]]
-    old_mu <- mu_hat_mat[, batches_ind[[kk]]]
-    old_phi <- phi_hat_mat[, batches_ind[[kk]]] * exp(delta_hat_mat[, kk])
-    new_mu <- mu_star_mat[, batches_ind[[kk]]]
-    new_phi <- phi_star_mat[, batches_ind[[kk]]]
-    adj_numCs_raw[, batches_ind[[kk]]] <- match_quantiles_betabin(numCs_sub = numCs_sub,
-                                                                  coverage_sub = coverage_sub,
-                                                                  old_mu = old_mu, 
-                                                                  old_phi = old_phi, 
-                                                                  new_mu = new_mu, 
-                                                                  new_phi = new_phi)
+  
+  chunk_inputs_adj <- lapply(row_chunks, function(rows) {
+    list(
+      sub_numCs     = numCs[rows, , drop = FALSE],
+      sub_coverage  = coverage[rows, , drop = FALSE],
+      sub_mu_hat    = mu_hat_mat[rows, , drop = FALSE],
+      sub_phi_hat   = phi_hat_mat[rows, , drop = FALSE],
+      sub_delta_hat = delta_hat_mat[rows, 1:n_batch, drop = FALSE],
+      sub_mu_star   = mu_star_mat[rows, , drop = FALSE],
+      sub_phi_star  = phi_star_mat[rows, , drop = FALSE]
+    )
+  })
+  
+  if (num_cores > 1L) {
+    chunk_res <- future.apply::future_lapply(
+      chunk_inputs_adj, .adjust_chunk_bb,
+      batches_ind = batches_ind,
+      n_batch     = n_batch,
+      future.seed = NULL)
+  } else {
+    chunk_res <- lapply(chunk_inputs_adj, .adjust_chunk_bb,
+                        batches_ind = batches_ind,
+                        n_batch     = n_batch)
   }
+  
+  for (ci in seq_along(row_chunks))
+    adj_numCs_raw[row_chunks[[ci]], ] <- chunk_res[[ci]]
   
   # Negative counts might occur for numeric reasons; convert negative counts to zero
   adj_numCs_raw[adj_numCs_raw < 0] <- 0
