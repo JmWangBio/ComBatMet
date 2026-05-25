@@ -43,6 +43,41 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// fit_leven_betabin_cpp
+List fit_leven_betabin_cpp(NumericMatrix y_r, NumericMatrix n_r, NumericMatrix phi_r, Nullable<NumericMatrix> weights_r, NumericMatrix design_r, NumericMatrix beta_r, double tol, int maxit);
+RcppExport SEXP _ComBatMet_fit_leven_betabin_cpp(SEXP y_rSEXP, SEXP n_rSEXP, SEXP phi_rSEXP, SEXP weights_rSEXP, SEXP design_rSEXP, SEXP beta_rSEXP, SEXP tolSEXP, SEXP maxitSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericMatrix >::type y_r(y_rSEXP);
+    Rcpp::traits::input_parameter< NumericMatrix >::type n_r(n_rSEXP);
+    Rcpp::traits::input_parameter< NumericMatrix >::type phi_r(phi_rSEXP);
+    Rcpp::traits::input_parameter< Nullable<NumericMatrix> >::type weights_r(weights_rSEXP);
+    Rcpp::traits::input_parameter< NumericMatrix >::type design_r(design_rSEXP);
+    Rcpp::traits::input_parameter< NumericMatrix >::type beta_r(beta_rSEXP);
+    Rcpp::traits::input_parameter< double >::type tol(tolSEXP);
+    Rcpp::traits::input_parameter< int >::type maxit(maxitSEXP);
+    rcpp_result_gen = Rcpp::wrap(fit_leven_betabin_cpp(y_r, n_r, phi_r, weights_r, design_r, beta_r, tol, maxit));
+    return rcpp_result_gen;
+END_RCPP
+}
+// compute_apl_betabin_cpp
+NumericVector compute_apl_betabin_cpp(NumericMatrix y_r, NumericMatrix n_r, NumericMatrix mu_r, NumericMatrix phi_r, Nullable<NumericMatrix> weights_r, bool do_adjust, NumericMatrix design_r);
+RcppExport SEXP _ComBatMet_compute_apl_betabin_cpp(SEXP y_rSEXP, SEXP n_rSEXP, SEXP mu_rSEXP, SEXP phi_rSEXP, SEXP weights_rSEXP, SEXP do_adjustSEXP, SEXP design_rSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericMatrix >::type y_r(y_rSEXP);
+    Rcpp::traits::input_parameter< NumericMatrix >::type n_r(n_rSEXP);
+    Rcpp::traits::input_parameter< NumericMatrix >::type mu_r(mu_rSEXP);
+    Rcpp::traits::input_parameter< NumericMatrix >::type phi_r(phi_rSEXP);
+    Rcpp::traits::input_parameter< Nullable<NumericMatrix> >::type weights_r(weights_rSEXP);
+    Rcpp::traits::input_parameter< bool >::type do_adjust(do_adjustSEXP);
+    Rcpp::traits::input_parameter< NumericMatrix >::type design_r(design_rSEXP);
+    rcpp_result_gen = Rcpp::wrap(compute_apl_betabin_cpp(y_r, n_r, mu_r, phi_r, weights_r, do_adjust, design_r));
+    return rcpp_result_gen;
+END_RCPP
+}
 // maximize_interpolant_cpp
 NumericVector maximize_interpolant_cpp(NumericVector spts, NumericMatrix ll);
 RcppExport SEXP _ComBatMet_maximize_interpolant_cpp(SEXP sptsSEXP, SEXP llSEXP) {
@@ -59,6 +94,8 @@ END_RCPP
 static const R_CallMethodDef CallEntries[] = {
     {"_ComBatMet_compute_apl_beta_cpp", (DL_FUNC) &_ComBatMet_compute_apl_beta_cpp, 6},
     {"_ComBatMet_fit_leven_beta_cpp", (DL_FUNC) &_ComBatMet_fit_leven_beta_cpp, 7},
+    {"_ComBatMet_fit_leven_betabin_cpp", (DL_FUNC) &_ComBatMet_fit_leven_betabin_cpp, 8},
+    {"_ComBatMet_compute_apl_betabin_cpp", (DL_FUNC) &_ComBatMet_compute_apl_betabin_cpp, 7},
     {"_ComBatMet_maximize_interpolant_cpp", (DL_FUNC) &_ComBatMet_maximize_interpolant_cpp, 2},
     {NULL, NULL, 0}
 };

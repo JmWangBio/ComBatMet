@@ -9,6 +9,14 @@ fit_leven_beta_cpp <- function(y_r, phi_r, weights_r, design_r, beta_r, tol, max
     .Call(`_ComBatMet_fit_leven_beta_cpp`, y_r, phi_r, weights_r, design_r, beta_r, tol, maxit)
 }
 
+fit_leven_betabin_cpp <- function(y_r, n_r, phi_r, weights_r, design_r, beta_r, tol, maxit) {
+    .Call(`_ComBatMet_fit_leven_betabin_cpp`, y_r, n_r, phi_r, weights_r, design_r, beta_r, tol, maxit)
+}
+
+compute_apl_betabin_cpp <- function(y_r, n_r, mu_r, phi_r, weights_r, do_adjust, design_r) {
+    .Call(`_ComBatMet_compute_apl_betabin_cpp`, y_r, n_r, mu_r, phi_r, weights_r, do_adjust, design_r)
+}
+
 maximize_interpolant_cpp <- function(spts, ll) {
     .Call(`_ComBatMet_maximize_interpolant_cpp`, spts, ll)
 }

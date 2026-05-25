@@ -14,7 +14,8 @@ ComBat_biseq(
   shrink = FALSE,
   mean.only = FALSE,
   feature.subset.n = NULL,
-  ncores = 1
+  ncores = 1,
+  use_cpp = TRUE
 )
 }
 \arguments{
@@ -37,6 +38,8 @@ ComBat_biseq(
 \item{feature.subset.n}{number of features to use in non-parametric EB estimation, only useful when shrink equals TRUE}
 
 \item{ncores}{number of cores to be used for parallel computing. By default, ncores is set to one.}
+
+\item{use_cpp}{logical; if TRUE (default), use fast C++ routines for parameter estimation. If FALSE, use the original aod-based approach.}
 }
 \value{
 \code{ComBat_biseq} returns a batch-adjusted feature x sample count matrix, representing number

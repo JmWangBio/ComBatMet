@@ -115,7 +115,6 @@ static void fit_leven_vec_betabin(
     double *obt, double *omu,
     double *odev, int *oiter, int *ofail)
 {
-  const double low_value           = 1e-10;
   const double one_millionth       = 1e-6;
   const double supremely_low_value = 1e-13;
   const double ridiculously_low    = 1e-100;
@@ -124,109 +123,111 @@ static void fit_leven_vec_betabin(
   
   /* Degenerate row check */
   int all_zero = 1;
-  for (int lib = 0; lib < nlib; ++lib)
+  for (int lib = 0; lib < nlib; ++lib) {
     if (n_vec[lib] > 0.0) { all_zero = 0; break; }
-    if (all_zero) {
-      for (int c = 0; c < ncoef; ++c) obt[c] = NA_REAL;
-      for (int lib = 0; lib < nlib; ++lib) omu[lib] = 0.5;
-      *odev = 0.0; *oiter = 0; *ofail = 0;
-      return;
+  }
+  
+  if (all_zero) {
+    for (int c = 0; c < ncoef; ++c) obt[c] = NA_REAL;
+    for (int lib = 0; lib < nlib; ++lib) omu[lib] = 0.5;
+    *odev = 0.0; *oiter = 0; *ofail = 0;
+    return;
+  }
+  
+  autofill_bb(ncoef, obt, nlib, omu, dm);
+  
+  double dev = 0.0;
+  for (int lib = 0; lib < nlib; ++lib)
+    dev += w[lib]*bb_nll(y[lib], n_vec[lib], omu[lib], phi_vec[lib]);
+  
+  double max_info = -1.0, lambda = 0.0;
+  int info = 0, iter = 0, failed = 0;
+  
+  while ((++iter) <= maxit) {
+    
+    /* Score and observed Fisher weights */
+    for (int lib = 0; lib < nlib; ++lib) {
+      double mui = omu[lib];
+      double phi = phi_vec[lib];
+      double ni  = n_vec[lib];
+      double dmu = mui*(1.0-mui);
+      double a   = mui*phi;
+      double b   = (1.0-mui)*phi;
+      double yi  = y[lib];
+      
+      drvt[lib] = phi*(digamma_bb(yi+a) - digamma_bb(ni-yi+b)
+                         -digamma_bb(a)    + digamma_bb(b))
+        * dmu * w[lib];
+        
+        double score_raw = digamma_bb(yi+a) - digamma_bb(ni-yi+b)
+          - digamma_bb(a)    + digamma_bb(b);
+        double curv = phi*phi
+        * (trigamma_bb(a) + trigamma_bb(b)
+             - trigamma_bb(yi+a) - trigamma_bb(ni-yi+b))
+             * dmu*dmu;
+             double link_adj = -phi * score_raw * dmu * (1.0 - 2.0*mui);
+             zwpt[lib] = (curv + link_adj) * w[lib];
     }
     
-    autofill_bb(ncoef, obt, nlib, omu, dm);
+    compute_xtwx_bb(nlib, ncoef, dm, zwpt, xtwx);
     
-    double dev = 0.0;
-    for (int lib = 0; lib < nlib; ++lib)
-      dev += w[lib]*bb_nll(y[lib], n_vec[lib], omu[lib], phi_vec[lib]);
+    double *dmc = dm, *xi = xtwx;
+    for (int c = 0; c < ncoef; ++c, dmc += nlib, xi += ncoef) {
+      dl[c] = 0.0;
+      for (int lib = 0; lib < nlib; ++lib)
+        dl[c] += drvt[lib]*dmc[lib];
+      if (xi[c] > max_info) max_info = xi[c];
+    }
+    if (iter == 1) {
+      lambda = max_info*one_millionth;
+      if (lambda < supremely_low_value) lambda = supremely_low_value;
+    }
     
-    double max_info = -1.0, lambda = 0.0;
-    int info = 0, iter = 0, failed = 0;
-    
-    while ((++iter) <= maxit) {
-      
-      /* Score and observed Fisher weights */
-      for (int lib = 0; lib < nlib; ++lib) {
-        double mui = omu[lib];
-        double phi = phi_vec[lib];
-        double ni  = n_vec[lib];
-        double dmu = mui*(1.0-mui);
-        double a   = mui*phi;
-        double b   = (1.0-mui)*phi;
-        double yi  = y[lib];
-        
-        drvt[lib] = phi*(digamma_bb(yi+a) - digamma_bb(ni-yi+b)
-                           -digamma_bb(a)    + digamma_bb(b))
-          * dmu * w[lib];
-          
-          double score_raw = digamma_bb(yi+a) - digamma_bb(ni-yi+b)
-            - digamma_bb(a)    + digamma_bb(b);
-          double curv = phi*phi
-          * (trigamma_bb(a) + trigamma_bb(b)
-               - trigamma_bb(yi+a) - trigamma_bb(ni-yi+b))
-               * dmu*dmu;
-               double link_adj = -phi * score_raw * dmu * (1.0 - 2.0*mui);
-               zwpt[lib] = (curv + link_adj) * w[lib];
-      }
-      
-      compute_xtwx_bb(nlib, ncoef, dm, zwpt, xtwx);
-      
-      double *dmc = dm, *xi = xtwx;
-      for (int c = 0; c < ncoef; ++c, dmc += nlib, xi += ncoef) {
-        dl[c] = 0.0;
-        for (int lib = 0; lib < nlib; ++lib)
-          dl[c] += drvt[lib]*dmc[lib];
-        if (xi[c] > max_info) max_info = xi[c];
-      }
-      if (iter == 1) {
-        lambda = max_info*one_millionth;
-        if (lambda < supremely_low_value) lambda = supremely_low_value;
-      }
-      
-      int lev = 0, low_dev = 0;
-      while (++lev) {
-        do {
-          double *xi2 = xtwx, *xci = xtwc;
-          for (int c1 = 0; c1 < ncoef; ++c1, xi2 += ncoef, xci += ncoef) {
-            for (int c2 = 0; c2 <= c1; ++c2) xci[c2] = xi2[c2];
-            xci[c1] += lambda;
-          }
-          F77_CALL(dpotrf)(&uplo, &ncoef, xtwc, &ncoef, &info FCONE);
-          if (info != 0) {
-            lambda *= 10.0;
-            if (lambda <= 0.0) lambda = ridiculously_low;
-          } else break;
-        } while (1);
-        
-        for (int c = 0; c < ncoef; ++c) db[c] = dl[c];
-        F77_CALL(dpotrs)(&uplo, &ncoef, &nrhs, xtwc, &ncoef,
-                 db, &ncoef, &info FCONE);
-        if (info != 0) Rcpp::stop("dpotrs failed in fit_leven_vec_betabin");
-        
-        for (int c = 0; c < ncoef; ++c) nbt[c] = obt[c]+db[c];
-        autofill_bb(ncoef, nbt, nlib, nmu, dm);
-        
-        double ndev = 0.0;
-        for (int lib = 0; lib < nlib; ++lib)
-          ndev += w[lib]*bb_nll(y[lib], n_vec[lib], nmu[lib], phi_vec[lib]);
-        
-        if (ndev < supremely_low_value) low_dev = 1;
-        if (ndev <= dev || low_dev) {
-          for (int c = 0; c < ncoef; ++c) obt[c] = nbt[c];
-          for (int lib = 0; lib < nlib; ++lib) omu[lib] = nmu[lib];
-          dev = ndev; break;
+    int lev = 0, low_dev = 0;
+    while (++lev) {
+      do {
+        double *xi2 = xtwx, *xci = xtwc;
+        for (int c1 = 0; c1 < ncoef; ++c1, xi2 += ncoef, xci += ncoef) {
+          for (int c2 = 0; c2 <= c1; ++c2) xci[c2] = xi2[c2];
+          xci[c1] += lambda;
         }
-        lambda *= 2.0;
-        if (lambda <= 0.0) lambda = ridiculously_low;
-        if (lambda/max_info > 1.0/supremely_low_value) { failed=1; break; }
-      }
+        F77_CALL(dpotrf)(&uplo, &ncoef, xtwc, &ncoef, &info FCONE);
+        if (info != 0) {
+          lambda *= 10.0;
+          if (lambda <= 0.0) lambda = ridiculously_low;
+        } else break;
+      } while (1);
       
-      double div = 0.0;
-      for (int c = 0; c < ncoef; ++c) div += dl[c]*db[c];
-      if (failed || low_dev || div < tol) {
-        *odev = dev; *oiter = iter; *ofail = failed; break;
+      for (int c = 0; c < ncoef; ++c) db[c] = dl[c];
+      F77_CALL(dpotrs)(&uplo, &ncoef, &nrhs, xtwc, &ncoef,
+               db, &ncoef, &info FCONE);
+      if (info != 0) Rcpp::stop("dpotrs failed in fit_leven_vec_betabin");
+      
+      for (int c = 0; c < ncoef; ++c) nbt[c] = obt[c]+db[c];
+      autofill_bb(ncoef, nbt, nlib, nmu, dm);
+      
+      double ndev = 0.0;
+      for (int lib = 0; lib < nlib; ++lib)
+        ndev += w[lib]*bb_nll(y[lib], n_vec[lib], nmu[lib], phi_vec[lib]);
+      
+      if (ndev < supremely_low_value) low_dev = 1;
+      if (ndev <= dev || low_dev) {
+        for (int c = 0; c < ncoef; ++c) obt[c] = nbt[c];
+        for (int lib = 0; lib < nlib; ++lib) omu[lib] = nmu[lib];
+        dev = ndev; break;
       }
-      if (lev == 1) lambda /= 10.0;
+      lambda *= 2.0;
+      if (lambda <= 0.0) lambda = ridiculously_low;
+      if (lambda/max_info > 1.0/supremely_low_value) { failed=1; break; }
     }
+    
+    double div = 0.0;
+    for (int c = 0; c < ncoef; ++c) div += dl[c]*db[c];
+    if (failed || low_dev || div < tol) {
+      *odev = dev; *oiter = iter; *ofail = failed; break;
+    }
+    if (lev == 1) lambda /= 10.0;
+  }
 }
 
 // [[Rcpp::export]]
