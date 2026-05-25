@@ -127,7 +127,7 @@ Afterwards, let's run `ComBat_met` as follows:
 adj_bv_mat <- ComBat_met(dat.se, dtype = "b-value", full_mod = TRUE)
 ```
 
-## Validating the C++ Implementation Against the Original betareg Approach
+## Validating the C++ Implementation Against the Original Approach
 
 The current version of ComBat-met uses custom C++ routines with LAPACK/BLAS kernels for parameter estimation, replacing the original `betareg`-based implementation. Here we demonstrate that both implementations produce highly consistent results on the same dataset.
 
@@ -167,6 +167,60 @@ legend("topleft",
        legend = paste0("r = ", round(cor_res$estimate, 2)),
        bty    = "n",
        cex    = 0.9)
+```
+
+We perform the same validation for `ComBat_biseq()`, comparing the new C++ implementation against the original `aod`-based approach on sequencing data.
+
+```{r, eval = TRUE}
+if (requireNamespace("methylKit", quietly = TRUE)) {
+  # Simulate bisulfite sequencing data using methylKit
+  my.methylBase <- methylKit::dataSim(replicates = 8, sites = 50,
+                                       treatment = c(1,1,1,1,0,0,0,0),
+                                       percentage = 10, effect = 25,
+                                       add.info = TRUE)
+  my.methylData <- methylKit::getData(my.methylBase[[1]])
+  coverage_mat <- as.matrix(my.methylData[, grep("coverage",
+                                                   colnames(my.methylData))])
+  class(coverage_mat) <- "numeric"
+  numCs_mat <- as.matrix(my.methylData[, grep("numCs",
+                                               colnames(my.methylData))])
+  class(numCs_mat) <- "numeric"
+  batch <- c(rep(1, 4), rep(2, 4))
+  group <- rep(c(0, 1), 4)
+
+  # Adjust using the C++ implementation (default)
+  adj_numCs_new <- ComBat_biseq(numCs = numCs_mat, coverage = coverage_mat,
+                                 batch = batch, group = group,
+                                 full_mod = TRUE, use_cpp = TRUE)
+
+  # Adjust using the original aod implementation
+  adj_numCs_old <- ComBat_biseq(numCs = numCs_mat, coverage = coverage_mat,
+                                 batch = batch, group = group,
+                                 full_mod = TRUE, use_cpp = FALSE)
+
+  # Compare the two implementations
+  cor_res_bb <- cor.test(as.vector(adj_numCs_old), as.vector(adj_numCs_new))
+  cor_res_bb
+}
+```
+
+The Pearson correlation between the two sets of adjusted counts is `r if (requireNamespace("methylKit", quietly = TRUE)) round(cor_res_bb$estimate, 2) else "N/A"`, confirming that the C++ implementation of `ComBat_biseq()` produces results that are virtually identical to the original `aod`-based approach.
+
+```{r, eval = TRUE, fig.cap = "Scatter plot comparing batch-adjusted counts from the C++ implementation (y-axis) and the original aod implementation (x-axis). Each point represents one methylated cytosine count."}
+if (requireNamespace("methylKit", quietly = TRUE)) {
+  plot(as.vector(adj_numCs_old),
+       as.vector(adj_numCs_new),
+       pch    = 20,
+       cex    = 0.4,
+       xlab   = "Adjusted counts (aod)",
+       ylab   = "Adjusted counts (C++)",
+       col    = rgb(0.2, 0.4, 0.8, alpha = 0.5))
+  abline(0, 1, col = "red", lty = 2, lwd = 1.5)
+  legend("topleft",
+         legend = paste0("r = ", round(cor_res_bb$estimate, 2)),
+         bty    = "n",
+         cex    = 0.9)
+}
 ```
 
 ## References
