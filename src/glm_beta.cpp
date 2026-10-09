@@ -165,6 +165,7 @@ static void fit_leven_vec_beta(
         while (++lev) {
 
             /* Copy lower triangle + augment diagonal, then Cholesky */
+            int chol_fail = 0, chol_tries = 0;
             do {
                 double *xi2 = xtwx, *xci = xtwc;
                 for (int c1 = 0; c1 < ncoef; ++c1, xi2 += ncoef, xci += ncoef) {
@@ -175,8 +176,10 @@ static void fit_leven_vec_beta(
                 if (info != 0) {
                     lambda *= 10.0;
                     if (lambda <= 0.0) lambda = ridiculously_low;
+                    if (!R_FINITE(lambda) || ++chol_tries > 200) { chol_fail = 1; break; }
                 } else { break; }
             } while (1);
+            if (chol_fail) { failed = 1; break; }
 
             for (int c = 0; c < ncoef; ++c) db[c] = dl[c];
             F77_CALL(dpotrs)(&uplo, &ncoef, &nrhs, xtwc, &ncoef,
